@@ -17,6 +17,8 @@ int main(int argc, char *argv[]) {
 
     MN *mobile_node;
     char *ponteiro;
+
+    
     mobile_node->num_pedidos = (int)strtol(argv[1], &ponteiro, 10);
     mobile_node->intervalo_tempo = (int)strtol(argv[2], &ponteiro, 10);
     mobile_node->mips = (int)strtol(argv[3], &ponteiro, 10);
