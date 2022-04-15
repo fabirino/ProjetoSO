@@ -7,17 +7,17 @@
 
 #include "auxiliar.h"
 
-struct Edge_Server {
+typedef struct {
     char nome[50];
     int mips1;
     int mips2;
-};
+}Edge_Server;
 
 typedef struct shared_memory {
     int QUEUE_POS;
     int MAX_WAIT;
     int EDGE_SERVER_NUMBER;
-
+    Edge_Server * servers;
 }SM;
 
 SM *shared_memory;
@@ -26,7 +26,7 @@ SM *shared_memory;
 // pthread_cond_t condicao = PTHREAD_COND_INITIALIZER;
 
 void config(char *path, SM *shared_memory);
-void createEdgeServers(char *path, struct Edge_Server servers[shared_memory->EDGE_SERVER_NUMBER]);
+void createEdgeServers(char *path);
 
 int main(int argc, char *argv[]) {
     
@@ -44,12 +44,11 @@ int main(int argc, char *argv[]) {
     strcpy(path, argv[1]);
     
     config(path, shared_memory);
-    struct Edge_Server servers[shared_memory->EDGE_SERVER_NUMBER];
-    createEdgeServers(path, servers);
-
-    printf("%s\n",servers[0].nome);
-    printf("%s\n",servers[1].nome);
-    printf("%s\n",servers[2].nome);
+    shared_memory->servers = (Edge_Server*)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
+    createEdgeServers(path);
+    printf("%s\n",shared_memory->servers[0].nome);
+    printf("%s\n",shared_memory->servers[1].nome);
+    printf("%s\n",shared_memory->servers[2].nome);
 
     log_msg("O programa iniciou", 0);
 
@@ -75,7 +74,7 @@ void config(char *path, SM *shared_memory){
 }
 
 // funcao que cria os edge servers com base nos dados obtidos no ficheiro config
-void createEdgeServers(char *path, struct Edge_Server servers[shared_memory->EDGE_SERVER_NUMBER]) {
+void createEdgeServers(char *path) {
 
     FILE * fich = fopen(path, "r");
     assert(fich);
@@ -93,20 +92,20 @@ void createEdgeServers(char *path, struct Edge_Server servers[shared_memory->EDG
             int n = 0;
             while (token != NULL) {
                 if (n == 0){
-                    strcpy(servers[i].nome, token);
+                    strcpy(shared_memory->servers[i].nome, token);
                     n++;
                 }
 
                 else if (n == 1){
                     int ret ;
                     ret = (int) strtol(token, &ptr, 10);
-                    servers[i].mips1 = ret;
+                    shared_memory->servers[i].mips1 = ret;
                     n++;
                 }
                 else if (n == 2){
                     int ret;
                     ret = (int) strtol(token, &ptr, 10);
-                    servers[i].mips2 = ret;
+                    shared_memory->servers[i].mips2 = ret;
                     n++;
                 }
 
