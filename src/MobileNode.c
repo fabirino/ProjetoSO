@@ -1,13 +1,7 @@
 #include "auxiliar.h"
 
-typedef struct Mobile_Node {
-    int num_pedidos;
-    int intervalo_tempo;
-    int mips;
-    int max_tempo;
-
-} MN;
-
+// mobile_node {nº pedidos a gerar} {intervalo entre pedidos em ms}
+// {milhares de instruções de cada pedido} {tempo máximo para execução}
 
 int main(int argc, char *argv[]) {
 
@@ -18,11 +12,10 @@ int main(int argc, char *argv[]) {
     MN *mobile_node;
     char *ponteiro;
 
-    
     mobile_node->num_pedidos = (int)strtol(argv[1], &ponteiro, 10);
     mobile_node->intervalo_tempo = (int)strtol(argv[2], &ponteiro, 10);
     mobile_node->mips = (int)strtol(argv[3], &ponteiro, 10);
-    mobile_node->max_tempo = (int)strtol(argv[4], &ponteiro, 10);;
+    mobile_node->max_tempo = (int)strtol(argv[4], &ponteiro, 10);
 
     printf("%d\n", mobile_node->num_pedidos);
     printf("%d\n", mobile_node->intervalo_tempo);
