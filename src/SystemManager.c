@@ -1,14 +1,14 @@
+// ./offload_simulator configfile.txt
 
 #include "auxiliar.h"
 
 SM *shared_memory;
 // pthread_mutex_t semaforo = PTHREAD_MUTEX_INITIALIZER;
-// pthread_t monitor;
 // pthread_cond_t condicao = PTHREAD_COND_INITIALIZER;
 
 int main(int argc, char *argv[]) {
-    
-    if (argc !=2){
+
+    if (argc != 2) {
         erro("Parametros errados. Exemplo:\noffload_simulator <config_file>\n");
     }
 
@@ -18,19 +18,79 @@ int main(int argc, char *argv[]) {
     // Attach shared memory
     shared_memory = (SM *)shmat(shmid, NULL, 0);
 
+    // Inicializar semaforos;
+    sem_unlink("SEM_MANUTENCAO");
+    sem_unlink("SEM_TAREFAS");
+    sem_unlink("SEM_FICHEIRO");
+    shared_memory->sem_manutencao = sem_open("SEM_MANUTENCAO", O_CREAT | O_EXCL, 0700, 1);
+    shared_memory->sem_manutencao = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
+    shared_memory->sem_manutencao = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
+
+
+    // Create Named Pipe
+    // TODO:
+
+    // Create Message QUEUE
+    // TODO: 
+
+    // Catch Signals
+    signal(SIGTSTP, SIGTSTP_HANDLER);
+    signal(SIGINT, SIGINT_HANDLER);
+
+    // Read config file 
     char path[20];
     strcpy(path, argv[1]);
-    
-    config(path, shared_memory);
-    shared_memory->servers = (Edge_Server*)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
-    createEdgeServers(path, shared_memory);
-    printf("%s\n",shared_memory->servers[0].nome);
-    printf("%s\n",shared_memory->servers[1].nome);
-    printf("%s\n",shared_memory->servers[2].nome);
 
-    log_msg("O programa iniciou", 0);
+    config(path, shared_memory);
+    shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
+    createEdgeServers(path, shared_memory);
+    printf("%s\n", shared_memory->servers[0].nome);
+    printf("%s\n", shared_memory->servers[1].nome);
+    printf("%s\n", shared_memory->servers[2].nome);
+
+    // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+
+    log_msg("O programa iniciou",shared_memory, 1);
+
+    // Task Manager ========================================================================
+    shared_memory->TM_pid = fork();
+    if (shared_memory->TM_pid == 0) {
+        log_msg("O processo Task Manager comecou\n",shared_memory, 0);
+
+        exit(0);
+    }
+
+    // Monitor =============================================================================
+    shared_memory->monitor_pid = fork();
+    if (shared_memory->monitor_pid == 0) {
+        log_msg("O processo Monitor comecou\n",shared_memory, 0);
+
+        // Inicializar ambos os vCPUs
+        // DUVIDA: iniciar os 2 no inicio e usar os 2 so quando necessario OU
+        //         inicializar apenas o primeiro e apenas inicializar o 2 quando entrar no High Performance ?
+        // ACHO QUE e a 2 opcao pq a funcao de criar leva uma funcao que a thread ira fazer 
+        for(int i = 0; i< shared_memory->EDGE_SERVER_NUMBER; i++){
+            pthread_create(&shared_memory->servers[i].vCPU1, NULL,function , NULL);
+            // pthread_create(&shared_memory->servers[i].vCPU2, NULL,function , NULL);
+
+        }
+
+        /*
+        if (shared_memory->High_Performance){
+            pthread_create(shared_memory->servers[i].vCPU2, NULL,function , NULL);
+        }
+        */
+
+        exit(0);
+    }
+
+    // Maintenance Manager =================================================================
+   shared_memory->maintenance_pid = fork();
+    if (shared_memory->maintenance_pid == 0) {
+        log_msg("O processo Maintenance Manager comecou\n",shared_memory, 0);
+
+        exit(0);
+    }
 
     return 0;
 }
-
-

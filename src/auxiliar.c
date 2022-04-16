@@ -28,7 +28,7 @@ void time_now(char * string){
 
 
 // a funcao escreve no ficheiro log da primeira vez e nas proximas da append
-void log_msg(char *msg, int first_time){
+void log_msg(char *msg, SM *shared_memory, int first_time){
     char mensagem[100];
     time_now(mensagem);
 
@@ -36,14 +36,16 @@ void log_msg(char *msg, int first_time){
 
     printf("%s\n", mensagem);
 
-    if(first_time == 0){
+    sem_wait(shared_memory->sem_ficheiro);
+
+    if(first_time == 1){
         FILE *log = fopen("log.txt", "w");
         if(log == NULL){
             erro("Erro ao abrir o ficheiro");
         }
         fprintf(log, "%s",mensagem);
         fprintf(log, "\n");
-    }else if(first_time == 1){
+    }else if(first_time == 0){
         FILE *log = fopen("log.txt", "a");
         if(log == NULL){
             erro("Erro ao abrir o ficheiro");
@@ -51,6 +53,8 @@ void log_msg(char *msg, int first_time){
         fprintf(log, "%s",mensagem);
         fprintf(log, "\n");
     }
+
+    sem_post(shared_memory->sem_ficheiro);
 }
 
 // funcao que le o ficheiro de configuracao
@@ -114,4 +118,39 @@ void createEdgeServers(char *path, SM *shared_memory) {
         num++;
     }
     fclose(fich);
+}
+
+// Funcao encarregue de executar as tarefas do Edge Server
+void *function(void *t){
+    int my_id = *((int *)t);
+
+}
+
+// Funcao que trata do CTRL-Z (imprime as estatisticas)
+void SIGTSTP_HANDLER(int signum){
+
+
+}
+
+// Funcao que trata do CTRL-C (termina o programa)
+void SIGINT_HANDLER(int signum){ // TODO: como passar a shared memory por parametros nesta funcao??
+
+    
+
+    // Esperar que as threads dos Edge Servers terminem
+    // for(int i = 0; i< shared_memory->EDGE_SERVER_NUMBER ;i++){
+	// 	pthread_join(shared_memory->servers[i].vCPU1,NULL);
+	// 	pthread_join(shared_memory->servers[i].vCPU2,NULL);
+    // }
+
+    // Fechar os semaforos
+    // sem_close(shared_memory->sem_manutencao);
+    // sem_close(shared_memory->sem_tarefas);
+    // sem_close(shared_memory->sem_ficheiro);
+    sem_unlink("SEM_MANUTENCAO");
+    sem_unlink("SEM_TAREFAS");
+    sem_unlink("SEM_FICHEIRO");
+
+
+    // log_msg("O programa terminou\n", shared_memory, 0);
 }
