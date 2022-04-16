@@ -23,9 +23,8 @@ int main(int argc, char *argv[]) {
     sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
     shared_memory->sem_manutencao = sem_open("SEM_MANUTENCAO", O_CREAT | O_EXCL, 0700, 1);
-    shared_memory->sem_manutencao = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
-    shared_memory->sem_manutencao = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
-
+    shared_memory->sem_tarefas = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
+    shared_memory->sem_ficheiro = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
 
     // Create Named Pipe
     // TODO:
@@ -48,14 +47,37 @@ int main(int argc, char *argv[]) {
     printf("%s\n", shared_memory->servers[1].nome);
     printf("%s\n", shared_memory->servers[2].nome);
 
+
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
     log_msg("O programa iniciou",shared_memory, 1);
 
+    printf("1\n");
+    // Criar um processo para cada Edge Server
+    char teste[100];
+    memset(teste ,0, 100);
+    for(int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++){
+        snprintf(teste, 100, "Edge server %d arrancou", i);
+        log_msg(teste, shared_memory, 0);
+        shared_memory->servers[i].pid = fork();
+        if(shared_memory->servers[i].pid == 0){
+            pthread_create(&shared_memory->servers[i].vCPU1, NULL, function, NULL);
+            memset(teste,0, 100);
+            snprintf(teste, 100, "CPU 1 do Edge server %d arrancou", i);
+            log_msg(teste, shared_memory, 0);
+            pthread_create(&shared_memory->servers[i].vCPU2, NULL, function, NULL);
+            memset(teste,0, 100);
+            snprintf(teste, 100, "CPU 2 do Edge server %d arrancou", i);
+            log_msg(teste, shared_memory, 0);
+
+            exit(0);
+        }
+    }
+
     // Task Manager ========================================================================
     shared_memory->TM_pid = fork();
     if (shared_memory->TM_pid == 0) {
-        log_msg("O processo Task Manager comecou\n",shared_memory, 0);
+        log_msg("O processo Task Manager comecou",shared_memory, 0);
 
         exit(0);
     }
@@ -63,23 +85,8 @@ int main(int argc, char *argv[]) {
     // Monitor =============================================================================
     shared_memory->monitor_pid = fork();
     if (shared_memory->monitor_pid == 0) {
-        log_msg("O processo Monitor comecou\n",shared_memory, 0);
+        log_msg("O processo Monitor comecou",shared_memory, 0);
 
-        // Inicializar ambos os vCPUs
-        // DUVIDA: iniciar os 2 no inicio e usar os 2 so quando necessario OU
-        //         inicializar apenas o primeiro e apenas inicializar o 2 quando entrar no High Performance ?
-        // ACHO QUE e a 2 opcao pq a funcao de criar leva uma funcao que a thread ira fazer 
-        for(int i = 0; i< shared_memory->EDGE_SERVER_NUMBER; i++){
-            pthread_create(&shared_memory->servers[i].vCPU1, NULL,function , NULL);
-            // pthread_create(&shared_memory->servers[i].vCPU2, NULL,function , NULL);
-
-        }
-
-        /*
-        if (shared_memory->High_Performance){
-            pthread_create(shared_memory->servers[i].vCPU2, NULL,function , NULL);
-        }
-        */
 
         exit(0);
     }
@@ -87,7 +94,7 @@ int main(int argc, char *argv[]) {
     // Maintenance Manager =================================================================
    shared_memory->maintenance_pid = fork();
     if (shared_memory->maintenance_pid == 0) {
-        log_msg("O processo Maintenance Manager comecou\n",shared_memory, 0);
+        log_msg("O processo Maintenance Manager comecou",shared_memory, 0);
 
         exit(0);
     }

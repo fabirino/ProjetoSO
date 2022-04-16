@@ -29,7 +29,7 @@ void time_now(char * string){
 
 // a funcao escreve no ficheiro log da primeira vez e nas proximas da append
 void log_msg(char *msg, SM *shared_memory, int first_time){
-    char mensagem[100];
+    char mensagem[1024];
     time_now(mensagem);
 
     strcat(mensagem, msg);
@@ -53,6 +53,7 @@ void log_msg(char *msg, SM *shared_memory, int first_time){
         fprintf(log, "%s",mensagem);
         fprintf(log, "\n");
     }
+
 
     sem_post(shared_memory->sem_ficheiro);
 }

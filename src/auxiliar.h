@@ -29,6 +29,7 @@ typedef struct {
     int mips1;
     int mips2;
 
+    pid_t pid;
     pthread_t vCPU1; // Usar em modo Normal
     pthread_t vCPU2; // Usar em modo High Performance
     pthread_mutex_t mutex; // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
@@ -48,7 +49,7 @@ typedef struct shared_memory {
     sem_t *sem_tarefas; // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
     sem_t *sem_ficheiro; // nao haverem 2 processos a escreverem no log ao mesmo tempo
 
-    // flag para alterar entre Normal e High Performance bool??
+    int CPU_ativos;
     // funcao colocar da FIFO ira verificar se a capacidade da lista esta acima de 80%
     // funcao retirar da FIFO ira verificar se a capacidade da lista esta abaixo de 20%
 } SM;

@@ -1,1 +1,16 @@
-18:15:00 O programa iniciou
+19:05:42 O programa iniciou
+19:05:42 O programa iniciou
+19:05:42 O programa iniciou
+19:05:42 O programa iniciou
+sso Maintenance Manager comecou
+19:05:42 Edge server 2 arrancou
+19:05:42 Edge server 1 arrancou
+19:05:42 Edge server 0 arrancou
+19:05:42 O processo Monitor comecou
+19:05:42 O processo Task Manager comecou
+19:05:42 Edge server 2 arrancou
+19:05:42 Edge server 1 arrancou
+19:05:42 Edge server 2 arrancou
+19:05:42 Edge server 0 arrancou
+19:05:42 Edge server 1 arrancou
+19:05:42 Edge server 0 arrancou
