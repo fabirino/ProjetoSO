@@ -1,7 +1,13 @@
-20:17:23 O programa iniciou
-20:17:23 O processo Task Manager comecou
-20:17:23 Edge server 0 arrancou
-20:17:24 O processo Monitor comecou
-20:17:24 O processo Maintenance Manager comecou
-20:17:24 Edge server 1 arrancou
-20:17:24 Edge server 2 arrancou
+11:48:30 O programa iniciou
+11:48:30 O processo Task Manager comecou
+11:48:30 Edge server 0 arrancou
+11:48:30 O processo Monitor comecou
+11:48:30 O processo Maintenance Manager comecou
+11:48:30 Edge server 1 arrancou
+11:48:30 CPU 1 do Edge server 0 arrancou
+11:48:30 Edge server 2 arrancou
+11:48:30 CPU 1 do Edge server 1 arrancou
+11:48:30 CPU 2 do Edge server 1 arrancou
+11:48:30 CPU 1 do Edge server 2 arrancou
+11:48:30 CPU 2 do Edge server 0 arrancou
+11:48:30 CPU 2 do Edge server 2 arrancou

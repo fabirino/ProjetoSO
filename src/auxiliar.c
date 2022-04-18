@@ -121,9 +121,10 @@ void createEdgeServers(char *path, SM *shared_memory) {
 
 // Funcao encarregue de executar as tarefas do Edge Server
 void *function(void *t) {
-    int my_id = *((int *)t);
-    pthread_exit(NULL);
+    // int my_id = *((int *)t);
 
+    printf("Thread criada\n");
+    pthread_exit(NULL);
     return NULL;
 }
 

@@ -51,10 +51,8 @@ int main(int argc, char *argv[]) {
     signal(SIGTSTP, SIGTSTP_HANDLER);
     signal(SIGINT, SIGINT_HANDLER);
 
-    args aux;
     // Task Manager ========================================================================
-    shared_memory->TM_pid = fork();
-    if (shared_memory->TM_pid == 0) {
+    if ((shared_memory->TM_pid = fork()) == 0) {
         // DEBUG:
         log_msg("O processo Task Manager comecou", shared_memory, 0);
 
@@ -64,15 +62,19 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             snprintf(teste, 100, "Edge server %d arrancou", i);
             log_msg(teste, shared_memory, 0);
-            shared_memory->servers[i].pid = fork();
-            if (shared_memory->servers[i].pid == 0) {
+            if ((shared_memory->servers[i].pid = fork()) == 0) {
                 // DEBUG:
-                pthread_create(&shared_memory->servers[i].vCPU1, NULL, function, (void *)aux);
+                // TODO: na funcao pthread_create colocar a struct do ES para ter acesso aos mips
+                if (pthread_create(&shared_memory->servers[i].vCPU1, NULL, function, NULL) != 0) { 
+                    erro("Criacao da thread");
+                }
                 memset(teste, 0, 100);
                 snprintf(teste, 100, "CPU 1 do Edge server %d arrancou", i);
                 log_msg(teste, shared_memory, 0);
 
-                pthread_create(&shared_memory->servers[i].vCPU2, NULL, function, (void *) aux);
+                if (pthread_create(&shared_memory->servers[i].vCPU2, NULL, function, NULL) != 0) {
+                    erro("Criacao da thread");
+                }
                 memset(teste, 0, 100);
                 snprintf(teste, 100, "CPU 2 do Edge server %d arrancou", i);
                 log_msg(teste, shared_memory, 0);
@@ -84,14 +86,14 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        while(wait(NULL)>0);
+        while (wait(NULL) > 0)
+            ;
 
         exit(0);
     }
 
     // Monitor =============================================================================
-    shared_memory->monitor_pid = fork();
-    if (shared_memory->monitor_pid == 0) {
+    if ((shared_memory->monitor_pid = fork()) == 0) {
         // DEBUG:
         log_msg("O processo Monitor comecou", shared_memory, 0);
 
@@ -99,17 +101,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Maintenance Manager =================================================================
-    shared_memory->maintenance_pid = fork();
-    if (shared_memory->maintenance_pid == 0) {
+    if ((shared_memory->maintenance_pid = fork()) == 0) {
         // DEBUG:
         log_msg("O processo Maintenance Manager comecou", shared_memory, 0);
 
         exit(0);
     }
 
-    for (int i = 0; i < 6; i++) {
-        pause();
-    }
-
+    while (wait(NULL) > 0)
+        ;
     return 0;
 }
