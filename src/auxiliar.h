@@ -17,7 +17,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#define TAM_FIFO 100 // TODO: alterar tamanho da FIFO
 #define BUFSIZE 1024 
 
 typedef struct Mobile_Node {
@@ -34,13 +33,13 @@ typedef struct {
     int mips2;
 
     pid_t pid;
-    pthread_t vCPU1;       // Usar em modo Normal
-    pthread_t vCPU2;       // Usar em modo High Performance
+    pthread_t vCPU[2];       // Usar em modo High Performance
     pthread_mutex_t mutex; // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
 } Edge_Server;
 
 typedef struct shared_memory {
     int QUEUE_POS;
+    no * lista;
     int MAX_WAIT;
     int EDGE_SERVER_NUMBER;
     Edge_Server *servers;
@@ -58,14 +57,21 @@ typedef struct shared_memory {
     // funcao retirar da FIFO ira verificar se a capacidade da lista esta abaixo de 20%
 } SM;
 
+typedef struct{
+    int capacidade_vcpu;
+    char nome_server[50];
+    int n_vcpu;
+}argumentos;
+
 typedef struct no {
     // some data
     bool ocupado;
 } no;
 
 
+
 typedef struct lista_ligada {
-    no no[TAM_FIFO];
+    no *no;
     int TAM;
 } MQ;
 
@@ -82,6 +88,10 @@ void createEdgeServers(char *path, SM *shared_memory);
 void SIGTSTP_HANDLER(int signum);
 
 void SIGINT_HANDLER(int signum);
+
+void task_menager(SM *shared_memory);
+
+void Edge_Server(SM *shared_memory, int i);
 
 void *function(void *t);
 

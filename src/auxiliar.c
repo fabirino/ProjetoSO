@@ -67,6 +67,8 @@ void config(char *path, SM *shared_memory) {
     fscanf(fich, "%s", line);
     shared_memory->QUEUE_POS = atoi(line);
 
+    shared_memory->lista = (no *)malloc(sizeof(no) * shared_memory->QUEUE_POS);
+
     fscanf(fich, "%s", line);
     shared_memory->MAX_WAIT = atoi(line);
 
@@ -120,6 +122,7 @@ void createEdgeServers(char *path, SM *shared_memory) {
 }
 
 void task_menager(SM *shared_memory) {
+
     // Criar um processo para cada Edge Server
     char teste[100];
     memset(teste, 0, 100);
@@ -128,13 +131,13 @@ void task_menager(SM *shared_memory) {
             snprintf(teste, 100, "Edge server %d arrancou", i+1);
             log_msg(teste, shared_memory, 0);
             // DEBUG:
-            edge_server_init(shared_memory, i);
+            Edge_Server(shared_memory, i);
             exit(0);
         }
     }
 }
 
-void edge_server_init(SM *shared_memory, int i) {
+void Edge_Server(SM *shared_memory, int i) {
     char mensagem[200];
     argumentos aux;
     for (int v = 0; v < 2; v++) {
@@ -146,8 +149,8 @@ void edge_server_init(SM *shared_memory, int i) {
         if (v == 1) {
             aux->capacidade_vcpu = shared_memory->servers[i].mips2;
         }
-        aux->vcpus = v + 1;
-        snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->vcpus, aux->nome_server, aux->capacidade_vcpu);
+        aux->n_vcpu = v + 1;
+        snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
         log_msg(mensagem, shared_memory, 0);
         pthread_create(&shared_memory->servers[i].vCPU[v], NULL, function, (void *)aux);
         memset(mensagem, 0, 200);
@@ -160,7 +163,7 @@ void edge_server_init(SM *shared_memory, int i) {
 // Funcao encarregue de executar as tarefas do Edge Server
 void *function(void *t) {
     argumentos aux = *(argumentos *)t;
-    //printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.vcpus, aux.nome_server, aux.capacidade_vcpu);
+    //printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
 
     pthread_exit(NULL);
 }
