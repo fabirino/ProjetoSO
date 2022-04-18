@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     config(path, shared_memory);
     shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
     createEdgeServers(path, shared_memory);
-    for(int p= 0;p<shared_memory->EDGE_SERVER_NUMBER){
+    for(int p= 0;p<shared_memory->EDGE_SERVER_NUMBER;p++){
         printf("%s\n", shared_memory->servers[p].nome);
     }
 

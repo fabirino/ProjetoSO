@@ -1,5 +1,5 @@
-//Eduardo Figueiredo 2020213717
-//Fábio Santos 2020212310
+// Eduardo Figueiredo 2020213717
+// Fábio Santos 2020212310
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -124,6 +124,11 @@ void createEdgeServers(char *path, SM *shared_memory) {
     fclose(fich);
 }
 
+void *p_scheduler(){// gestão do escalonamento das tarefas
+    //TODO:code here
+    pthread_exit(NULL);
+}
+
 void task_menager(SM *shared_memory) {
 
     // Criar um processo para cada Edge Server
@@ -131,13 +136,19 @@ void task_menager(SM *shared_memory) {
     memset(teste, 0, 100);
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         if ((shared_memory->servers[i].pid = fork()) == 0) {
-            snprintf(teste, 100, "Edge server %d arrancou", i+1);
+            snprintf(teste, 100, "Edge server %d arrancou", i + 1);
             log_msg(teste, shared_memory, 0);
             // DEBUG:
             Server(shared_memory, i);
             exit(0);
         }
     }
+    pthread_t scheduler;
+    pthread_create(&scheduler,NULL,p_scheduler,NULL); //Criação da thread scheduler
+    memset(teste,0,100);
+    snprintf(teste,100,"Criação da thread scheduler");
+    log_msg(teste,shared_memory,0);
+    pthread_join(scheduler,NULL);
 }
 
 void Server(SM *shared_memory, int i) {
@@ -166,7 +177,7 @@ void Server(SM *shared_memory, int i) {
 // Funcao encarregue de executar as tarefas do Edge Server
 void *function(void *t) {
     argumentos aux = *(argumentos *)t;
-    //printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
+    // printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
 
     pthread_exit(NULL);
 }
