@@ -1,3 +1,6 @@
+//Eduardo Figueiredo 2020213717
+//Fábio Santos 2020212310
+
 #ifndef AUXILIAR_H
 #define AUXILIAR_H
 

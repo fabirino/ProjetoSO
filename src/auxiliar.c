@@ -1,3 +1,6 @@
+//Eduardo Figueiredo 2020213717
+//Fábio Santos 2020212310
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

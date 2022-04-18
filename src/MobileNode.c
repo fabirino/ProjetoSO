@@ -1,3 +1,6 @@
+//Eduardo Figueiredo 2020213717
+//Fábio Santos 2020212310
+
 #include "auxiliar.h"
 
 // mobile_node {nº pedidos a gerar} {intervalo entre pedidos em ms}
