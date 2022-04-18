@@ -56,35 +56,7 @@ int main(int argc, char *argv[]) {
         // DEBUG:
         log_msg("O processo Task Manager comecou", shared_memory, 0);
 
-        // Criar um processo para cada Edge Server
-        char teste[100];
-        memset(teste, 0, 100);
-        for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-            snprintf(teste, 100, "Edge server %d arrancou", i);
-            log_msg(teste, shared_memory, 0);
-            if ((shared_memory->servers[i].pid = fork()) == 0) {
-                // DEBUG:
-                // TODO: na funcao pthread_create colocar a struct do ES para ter acesso aos mips
-                if (pthread_create(&shared_memory->servers[i].vCPU1, NULL, function, NULL) != 0) { 
-                    erro("Criacao da thread");
-                }
-                memset(teste, 0, 100);
-                snprintf(teste, 100, "CPU 1 do Edge server %d arrancou", i);
-                log_msg(teste, shared_memory, 0);
-
-                if (pthread_create(&shared_memory->servers[i].vCPU2, NULL, function, NULL) != 0) {
-                    erro("Criacao da thread");
-                }
-                memset(teste, 0, 100);
-                snprintf(teste, 100, "CPU 2 do Edge server %d arrancou", i);
-                log_msg(teste, shared_memory, 0);
-
-                pthread_join(shared_memory->servers[i].vCPU1, NULL);
-                pthread_join(shared_memory->servers[i].vCPU2, NULL);
-
-                exit(0);
-            }
-        }
+        task_menager(shared_memory);
 
         while (wait(NULL) > 0)
             ;
@@ -110,5 +82,6 @@ int main(int argc, char *argv[]) {
 
     while (wait(NULL) > 0)
         ;
+
     return 0;
 }

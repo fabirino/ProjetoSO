@@ -29,12 +29,12 @@ void time_now(char *string) {
 // a funcao escreve no ficheiro log da primeira vez e nas proximas da append
 void log_msg(char *msg, SM *shared_memory, int first_time) {
     sem_wait(shared_memory->sem_ficheiro);
-    
+
     char mensagem[BUFSIZE];
     time_now(mensagem);
 
     strcat(mensagem, msg);
-    
+
     printf("%s\n", mensagem);
 
     if (first_time == 1) {
@@ -119,13 +119,50 @@ void createEdgeServers(char *path, SM *shared_memory) {
     fclose(fich);
 }
 
+void task_menager(SM *shared_memory) {
+    // Criar um processo para cada Edge Server
+    char teste[100];
+    memset(teste, 0, 100);
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+        if ((shared_memory->servers[i].pid = fork()) == 0) {
+            snprintf(teste, 100, "Edge server %d arrancou", i+1);
+            log_msg(teste, shared_memory, 0);
+            // DEBUG:
+            edge_server_init(shared_memory, i);
+            exit(0);
+        }
+    }
+}
+
+void edge_server_init(SM *shared_memory, int i) {
+    char mensagem[200];
+    argumentos aux;
+    for (int v = 0; v < 2; v++) {
+        argumentos *aux = (argumentos *)malloc(sizeof(argumentos));
+        strcpy(aux->nome_server, shared_memory->servers[i].nome);
+        if (v == 0) {
+            aux->capacidade_vcpu = shared_memory->servers[i].mips1;
+        }
+        if (v == 1) {
+            aux->capacidade_vcpu = shared_memory->servers[i].mips2;
+        }
+        aux->vcpus = v + 1;
+        snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->vcpus, aux->nome_server, aux->capacidade_vcpu);
+        log_msg(mensagem, shared_memory, 0);
+        pthread_create(&shared_memory->servers[i].vCPU[v], NULL, function, (void *)aux);
+        memset(mensagem, 0, 200);
+    }
+    for (int j = 0; j < 2; j++) {
+        pthread_join(shared_memory->servers[i].vCPU[j], NULL);
+    }
+}
+
 // Funcao encarregue de executar as tarefas do Edge Server
 void *function(void *t) {
-    // int my_id = *((int *)t);
+    argumentos aux = *(argumentos *)t;
+    //printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.vcpus, aux.nome_server, aux.capacidade_vcpu);
 
-    printf("Thread criada\n");
     pthread_exit(NULL);
-    return NULL;
 }
 
 // Funcao que trata do CTRL-Z (imprime as estatisticas)
