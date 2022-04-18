@@ -131,13 +131,13 @@ void task_menager(SM *shared_memory) {
             snprintf(teste, 100, "Edge server %d arrancou", i+1);
             log_msg(teste, shared_memory, 0);
             // DEBUG:
-            Edge_Server(shared_memory, i);
+            Server(shared_memory, i);
             exit(0);
         }
     }
 }
 
-void Edge_Server(SM *shared_memory, int i) {
+void Server(SM *shared_memory, int i) {
     char mensagem[200];
     argumentos aux;
     for (int v = 0; v < 2; v++) {

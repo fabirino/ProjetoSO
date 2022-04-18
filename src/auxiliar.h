@@ -37,6 +37,11 @@ typedef struct {
     pthread_mutex_t mutex; // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
 } Edge_Server;
 
+typedef struct no {
+    // some data
+    bool ocupado;
+} no;
+
 typedef struct shared_memory {
     int QUEUE_POS;
     no * lista;
@@ -63,17 +68,6 @@ typedef struct{
     int n_vcpu;
 }argumentos;
 
-typedef struct no {
-    // some data
-    bool ocupado;
-} no;
-
-
-
-typedef struct lista_ligada {
-    no *no;
-    int TAM;
-} MQ;
 
 void erro(char *msg);
 
@@ -91,7 +85,7 @@ void SIGINT_HANDLER(int signum);
 
 void task_menager(SM *shared_memory);
 
-void Edge_Server(SM *shared_memory, int i);
+void Server(SM *shared_memory, int i);
 
 void *function(void *t);
 
