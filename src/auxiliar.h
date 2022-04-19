@@ -71,24 +71,25 @@ typedef struct{
     int n_vcpu;
 }argumentos;
 
+SM *shared_memory;
 
 void erro(char *msg);
 
 void time_now(char *string);
 
-void log_msg(char *msg, SM *shared_memory, int first_time);
+void log_msg(char *msg, int first_time);
 
-void config(char *path, SM *shared_memory);
+void config(char *path);
 
-void createEdgeServers(char *path, SM *shared_memory);
+void createEdgeServers(char *path);
 
 void SIGTSTP_HANDLER(int signum);
 
 void SIGINT_HANDLER(int signum);
 
-void task_menager(SM *shared_memory);
+void task_menager();
 
-void Server(SM *shared_memory, int i);
+void Server( int i);
 
 void *function(void *t);
 

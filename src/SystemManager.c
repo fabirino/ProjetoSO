@@ -5,7 +5,10 @@
 
 #include "auxiliar.h"
 
-SM *shared_memory;
+//TODO: semafro para aceder a dados da memoria partilhada!!
+// protecoes no config file(verificar se é inteiro ou string)
+ 
+
 // pthread_mutex_t semaforo = PTHREAD_MUTEX_INITIALIZER;
 // pthread_cond_t condicao = PTHREAD_COND_INITIALIZER;
 
@@ -16,7 +19,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Create shared memory
-    int shmid = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0766);
+    int shmid = shmget(IPC_PRIVATE, sizeof(SM), IPC_CREAT | 0766);
 
     // Attach shared memory
     shared_memory = (SM *)shmat(shmid, NULL, 0);
@@ -39,16 +42,16 @@ int main(int argc, char *argv[]) {
     char path[20];
     strcpy(path, argv[1]);
 
-    config(path, shared_memory);
+    config(path);
     shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
-    createEdgeServers(path, shared_memory);
+    createEdgeServers(path);
     for(int p= 0;p<shared_memory->EDGE_SERVER_NUMBER;p++){
         printf("%s\n", shared_memory->servers[p].nome);
     }
 
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
-    log_msg("O programa iniciou", shared_memory, 1);
+    log_msg("O programa iniciou", 1);
 
     // Catch Signals
     signal(SIGTSTP, SIGTSTP_HANDLER);
@@ -57,9 +60,9 @@ int main(int argc, char *argv[]) {
     // Task Manager ========================================================================
     if ((shared_memory->TM_pid = fork()) == 0) {
         // DEBUG:
-        log_msg("O processo Task Manager comecou", shared_memory, 0);
+        log_msg("O processo Task Manager comecou", 0);
 
-        task_menager(shared_memory);
+        task_menager();
 
         while (wait(NULL) > 0)
             ;
@@ -70,7 +73,7 @@ int main(int argc, char *argv[]) {
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
         // DEBUG:
-        log_msg("O processo Monitor comecou", shared_memory, 0);
+        log_msg("O processo Monitor comecou", 0);
 
         exit(0);
     }
@@ -78,7 +81,7 @@ int main(int argc, char *argv[]) {
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {
         // DEBUG:
-        log_msg("O processo Maintenance Manager comecou", shared_memory, 0);
+        log_msg("O processo Maintenance Manager comecou", 0);
 
         exit(0);
     }

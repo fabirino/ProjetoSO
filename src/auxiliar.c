@@ -30,7 +30,7 @@ void time_now(char *string) {
 }
 
 // a funcao escreve no ficheiro log da primeira vez e nas proximas da append
-void log_msg(char *msg, SM *shared_memory, int first_time) {
+void log_msg(char *msg, int first_time) {
     sem_wait(shared_memory->sem_ficheiro);
 
     char mensagem[BUFSIZE];
@@ -61,7 +61,7 @@ void log_msg(char *msg, SM *shared_memory, int first_time) {
 }
 
 // funcao que le o ficheiro de configuracao
-void config(char *path, SM *shared_memory) {
+void config(char *path) {
     FILE *fich = fopen(path, "r");
     assert(fich);
 
@@ -77,11 +77,15 @@ void config(char *path, SM *shared_memory) {
 
     fscanf(fich, "%s", line);
     shared_memory->EDGE_SERVER_NUMBER = atoi(line);
+    if(shared_memory->EDGE_SERVER_NUMBER < 2){
+        log_msg("Numero insuficiente de Edge Servers(>=2)!!",1);
+        exit(0);
+    }
     fclose(fich);
 }
 
 // funcao que cria os edge servers com base nos dados obtidos no ficheiro config
-void createEdgeServers(char *path, SM *shared_memory) {
+void createEdgeServers(char *path) {
 
     FILE *fich = fopen(path, "r");
     assert(fich);
@@ -129,7 +133,7 @@ void *p_scheduler(){// gestão do escalonamento das tarefas
     pthread_exit(NULL);
 }
 
-void task_menager(SM *shared_memory) {
+void task_menager() {
 
     // Criar um processo para cada Edge Server
     char teste[100];
@@ -137,9 +141,9 @@ void task_menager(SM *shared_memory) {
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         if ((shared_memory->servers[i].pid = fork()) == 0) {
             snprintf(teste, 100, "Edge server %d arrancou", i + 1);
-            log_msg(teste, shared_memory, 0);
+            log_msg(teste, 0);
             // DEBUG:
-            Server(shared_memory, i);
+            Server( i);
             exit(0);
         }
     }
@@ -147,11 +151,11 @@ void task_menager(SM *shared_memory) {
     pthread_create(&scheduler,NULL,p_scheduler,NULL); //Criação da thread scheduler
     memset(teste,0,100);
     snprintf(teste,100,"Criação da thread scheduler");
-    log_msg(teste,shared_memory,0);
+    log_msg(teste,0);
     pthread_join(scheduler,NULL);
 }
 
-void Server(SM *shared_memory, int i) {
+void Server( int i) {
     char mensagem[200];
     argumentos aux;
     for (int v = 0; v < 2; v++) {
@@ -165,7 +169,7 @@ void Server(SM *shared_memory, int i) {
         }
         aux->n_vcpu = v + 1;
         snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
-        log_msg(mensagem, shared_memory, 0);
+        log_msg(mensagem, 0);
         pthread_create(&shared_memory->servers[i].vCPU[v], NULL, function, (void *)aux);
         memset(mensagem, 0, 200);
     }
