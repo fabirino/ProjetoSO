@@ -8,11 +8,6 @@
 
 #include "auxiliar.h"
 
-void erro(char *msg) {
-    perror(msg);
-    exit(1);
-}
-
 // devolve o tempo formatado
 void time_now(char *string) {
     time_t tempo = time(NULL);
@@ -60,6 +55,12 @@ void log_msg(char *msg, int first_time) {
     sem_post(shared_memory->sem_ficheiro);
 }
 
+void erro(char *msg) {
+    perror(msg);
+    log_msg("O programa terminou devido a um erro.", 0);
+    exit(1);
+}
+
 // funcao que le o ficheiro de configuracao
 void config(char *path) {
     FILE *fich = fopen(path, "r");
@@ -70,15 +71,13 @@ void config(char *path) {
     fscanf(fich, "%s", line);
     shared_memory->QUEUE_POS = atoi(line);
 
-    shared_memory->lista = (no *)malloc(sizeof(no) * shared_memory->QUEUE_POS);
-
     fscanf(fich, "%s", line);
     shared_memory->MAX_WAIT = atoi(line);
 
     fscanf(fich, "%s", line);
     shared_memory->EDGE_SERVER_NUMBER = atoi(line);
-    if(shared_memory->EDGE_SERVER_NUMBER < 2){
-        log_msg("Numero insuficiente de Edge Servers(>=2)!!",1);
+    if (shared_memory->EDGE_SERVER_NUMBER < 2) {
+        log_msg("Numero insuficiente de Edge Servers(>=2)!!", 1);
         exit(0);
     }
     fclose(fich);
@@ -128,8 +127,8 @@ void createEdgeServers(char *path) {
     fclose(fich);
 }
 
-void *p_scheduler(){// gestão do escalonamento das tarefas
-    //TODO:code here
+void *p_scheduler() { // gestão do escalonamento das tarefas
+    // TODO:code here
     pthread_exit(NULL);
 }
 
@@ -143,19 +142,20 @@ void task_menager() {
             snprintf(teste, 100, "Edge server %d arrancou", i + 1);
             log_msg(teste, 0);
             // DEBUG:
-            Server( i);
+            Server(i);
             exit(0);
         }
     }
     pthread_t scheduler;
-    pthread_create(&scheduler,NULL,p_scheduler,NULL); //Criação da thread scheduler
-    memset(teste,0,100);
-    snprintf(teste,100,"Criação da thread scheduler");
-    log_msg(teste,0);
-    pthread_join(scheduler,NULL);
+    pthread_create(&scheduler, NULL, p_scheduler, NULL); // Criação da thread scheduler
+    memset(teste, 0, 100);
+    snprintf(teste, 100, "Criação da thread scheduler");
+    log_msg(teste, 0);
+    pthread_join(scheduler, NULL);
 }
 
-void Server( int i) {
+// Funcao encarregue de executar as tarefas de cada E-Server
+void Server(int i) {
     char mensagem[200];
     argumentos aux;
     for (int v = 0; v < 2; v++) {
@@ -191,26 +191,29 @@ void SIGTSTP_HANDLER(int signum) {
 
     printf("------Estatisticas------\n");
 
-    // TODO:
+    // TODO: descobrir que estatisticas imprimir
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
-void SIGINT_HANDLER(int signum) { // TODO: como passar a shared memory por parametros nesta funcao??
+void SIGINT_HANDLER(int signum) { // TODO: terminar a MQ
 
     // Esperar que as threads dos Edge Servers terminem
-    // for(int i = 0; i< shared_memory->EDGE_SERVER_NUMBER ;i++){
-    // 	pthread_join(shared_memory->servers[i].vCPU1,NULL);
-    // 	pthread_join(shared_memory->servers[i].vCPU2,NULL);
-    // }
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+        pthread_join(shared_memory->servers[i].vCPU[0], NULL);
+        pthread_join(shared_memory->servers[i].vCPU[1], NULL);
+    }
+
+    // MQ
+    // msgctl(shared_memory->mqid)
 
     // Fechar os semaforos
-    // sem_close(shared_memory->sem_manutencao);
-    // sem_close(shared_memory->sem_tarefas);
-    // sem_close(shared_memory->sem_ficheiro);
+    sem_close(shared_memory->sem_manutencao);
+    sem_close(shared_memory->sem_tarefas);
+    sem_close(shared_memory->sem_ficheiro);
     sem_unlink("SEM_MANUTENCAO");
     sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
     exit(0);
 
-    // log_msg("O programa terminou\n", shared_memory, 0);
+    log_msg("O programa terminou\n", 0);
 }

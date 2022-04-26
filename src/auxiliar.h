@@ -37,17 +37,12 @@ typedef struct {
 
     pid_t pid;
     pthread_t vCPU[2];       // Usar em modo High Performance
-    pthread_mutex_t mutex; // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
+    pthread_mutex_t mutex;   // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
 } Edge_Server;
 
-typedef struct no {
-    // some data
-    bool ocupado;
-} no;
 
 typedef struct shared_memory {
     int QUEUE_POS;
-    no * lista;
     int MAX_WAIT;
     int EDGE_SERVER_NUMBER;
     Edge_Server *servers;
@@ -55,6 +50,8 @@ typedef struct shared_memory {
     pid_t TM_pid;
     pid_t monitor_pid;
     pid_t maintenance_pid;
+
+    int MQid;
 
     sem_t *sem_manutencao; // semaforo usado para parar os Edge Servers
     sem_t *sem_tarefas;    // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)

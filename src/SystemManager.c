@@ -1,13 +1,12 @@
-//Eduardo Figueiredo 2020213717
-//Fábio Santos 2020212310
+// Eduardo Figueiredo 2020213717
+// Fábio Santos 2020212310
 
 // ./offload_simulator configfile.txt
 
 #include "auxiliar.h"
 
-//TODO: semafro para aceder a dados da memoria partilhada!!
-// protecoes no config file(verificar se é inteiro ou string)
- 
+// TODO: semafro para aceder a dados da memoria partilhada!!
+// TODO: protecoes no config file(verificar se é inteiro ou string)
 
 // pthread_mutex_t semaforo = PTHREAD_MUTEX_INITIALIZER;
 // pthread_cond_t condicao = PTHREAD_COND_INITIALIZER;
@@ -32,11 +31,15 @@ int main(int argc, char *argv[]) {
     shared_memory->sem_tarefas = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_ficheiro = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
 
+    log_msg("O programa iniciou", 1);
+
     // Create Named Pipe
     // TODO:
 
     // Create Message QUEUE
-    // TODO:
+    if ((shared_memory->MQid = msgget(IPC_PRIVATE, IPC_CREAT | 0700)) == -1) {
+        erro("Erro ao criar a Message Queue");
+    }
 
     // Read config file
     char path[20];
@@ -45,13 +48,11 @@ int main(int argc, char *argv[]) {
     config(path);
     shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
     createEdgeServers(path);
-    for(int p= 0;p<shared_memory->EDGE_SERVER_NUMBER;p++){
+    for (int p = 0; p < shared_memory->EDGE_SERVER_NUMBER; p++) {
         printf("%s\n", shared_memory->servers[p].nome);
     }
 
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
-
-    log_msg("O programa iniciou", 1);
 
     // Catch Signals
     signal(SIGTSTP, SIGTSTP_HANDLER);
@@ -59,7 +60,6 @@ int main(int argc, char *argv[]) {
 
     // Task Manager ========================================================================
     if ((shared_memory->TM_pid = fork()) == 0) {
-        // DEBUG:
         log_msg("O processo Task Manager comecou", 0);
 
         task_menager();
@@ -72,7 +72,6 @@ int main(int argc, char *argv[]) {
 
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
-        // DEBUG:
         log_msg("O processo Monitor comecou", 0);
 
         exit(0);
@@ -80,7 +79,6 @@ int main(int argc, char *argv[]) {
 
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {
-        // DEBUG:
         log_msg("O processo Maintenance Manager comecou", 0);
 
         exit(0);
