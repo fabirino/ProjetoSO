@@ -33,13 +33,12 @@ int main(int argc, char *argv[]) {
 
     log_msg("O programa iniciou", 1);
 
-    // Create Named Pipe
-    // TODO:
-
-    // Create Message QUEUE
-    if ((shared_memory->MQid = msgget(IPC_PRIVATE, IPC_CREAT | 0700)) == -1) {
-        erro("Erro ao criar a Message Queue");
+    // cria o named pipe se ainda nao existe
+    if ((mkfifo(PIPE_NAME, O_CREAT | O_EXCL | 0600) < 0) && (errno != EEXIST)) {
+        perror("Nao se pode criar o pipe:");
+        exit(0);
     }
+    log_msg("Pipe iniciou", 0);
 
     // Read config file
     char path[20];
@@ -58,6 +57,19 @@ int main(int argc, char *argv[]) {
     signal(SIGTSTP, SIGTSTP_HANDLER);
     signal(SIGINT, SIGINT_HANDLER);
 
+    // Monitor =============================================================================
+    if ((shared_memory->monitor_pid = fork()) == 0) {
+        log_msg("O processo Monitor comecou", 0);
+
+        exit(0);
+    }
+
+    // Create message queue
+    //  Create Message QUEUE
+    if ((MQid = msgget(IPC_PRIVATE, IPC_CREAT | 0700)) == -1) {
+        erro("Erro ao criar a Message Queue");
+    }
+
     // Task Manager ========================================================================
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
@@ -66,13 +78,6 @@ int main(int argc, char *argv[]) {
 
         while (wait(NULL) > 0)
             ;
-
-        exit(0);
-    }
-
-    // Monitor =============================================================================
-    if ((shared_memory->monitor_pid = fork()) == 0) {
-        log_msg("O processo Monitor comecou", 0);
 
         exit(0);
     }

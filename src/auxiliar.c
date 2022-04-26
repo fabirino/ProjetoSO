@@ -132,6 +132,11 @@ void *p_scheduler() { // gestão do escalonamento das tarefas
     pthread_exit(NULL);
 }
 
+void *p_dispatcher() { // distribuição das tarefas
+    // TODO:code here
+    pthread_exit(NULL);
+}
+
 void task_menager() {
 
     // Criar um processo para cada Edge Server
@@ -146,12 +151,38 @@ void task_menager() {
             exit(0);
         }
     }
+
+    // Abrir pipe para ler
+    int fd;
+    if ((fd = open(PIPE_NAME, O_RDWR)) < 0) {
+        perror("Nao pode abrir o pipe para ler:");
+        exit(0);
+    }
+
+    //-------------------------
+    //DEBUG: acho que isto faz-se na thread schedular! DUVIDAS NESTA PARTE POR ISSO FICA POR AQUI xD
+    int r;
+    r = read(fd, &n, sizeof(numbers));
+    if (r < 0)
+        perror("Named Pipe");
+    printf("[SERVER] Read %d bytes: reveived (%d,%d), adding it: %d\n",
+           r, n.a, n.b, n.a + n.b);
+    //----------------------------
+
     pthread_t scheduler;
     pthread_create(&scheduler, NULL, p_scheduler, NULL); // Criação da thread scheduler
     memset(teste, 0, 100);
     snprintf(teste, 100, "Criação da thread scheduler");
     log_msg(teste, 0);
+
+    pthread_t dispatcher;
+    pthread_create(&dispatcher, NULL, p_dispatcher, NULL); // Criação da thread dispatcher
+    memset(teste, 0, 100);
+    snprintf(teste, 100, "Criação da thread dispatcher");
+    log_msg(teste, 0);
+
     pthread_join(scheduler, NULL);
+    pthread_join(dispatcher, NULL);
 }
 
 // Funcao encarregue de executar as tarefas de cada E-Server

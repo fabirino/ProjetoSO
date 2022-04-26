@@ -20,7 +20,17 @@
 #include <time.h>
 #include <unistd.h>
 
-#define BUFSIZE 1024 
+#define BUFSIZE 1024
+#define PIPE_NAME "TASK_PIPE"
+
+int MQid;
+
+typedef struct {
+    /* Message type */
+    long priority;
+    /* Payload */
+    int msg_number;
+} priority_msg;
 
 typedef struct Mobile_Node {
     int num_pedidos;
@@ -50,8 +60,6 @@ typedef struct shared_memory {
     pid_t TM_pid;
     pid_t monitor_pid;
     pid_t maintenance_pid;
-
-    int MQid;
 
     sem_t *sem_manutencao; // semaforo usado para parar os Edge Servers
     sem_t *sem_tarefas;    // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
