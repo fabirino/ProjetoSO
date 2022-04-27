@@ -3,7 +3,6 @@
 
 #include "auxiliar.h"
 
-
 // mobile_node {nº pedidos a gerar} {intervalo entre pedidos em ms}
 // {milhares de instruções de cada pedido} {tempo máximo para execução}
 
@@ -15,23 +14,36 @@ int main(int argc, char *argv[]) {
     // Opens the pipe for writing
     int fd;
     if ((fd = open(PIPE_NAME, O_WRONLY)) < 0) {
-        perror("Cannot open pipe for writing: ");
+        perror("Erro ao abrir o Pipe ");
         exit(0);
     }
 
-    MN mobile_node;
+    /* Intializes random number generator */
+    time_t t;
+    srand((unsigned)time(&t));
 
-    mobile_node.num_pedidos = atoi(argv[1]);
-    mobile_node.intervalo_tempo =  atoi(argv[2]);
-    mobile_node.mips =  atoi(argv[3]);
-    mobile_node.max_tempo =  atoi(argv[4]);
-    
-    write(fd, &mobile_node, sizeof(MN));
+    int idTarefa = random();// TODO: ?????????
+    int num_pedidos = atoi(argv[1]);
+    int max_tempo = atoi(argv[4]);
 
-    printf("%d\n", mobile_node.num_pedidos);
-    printf("%d\n", mobile_node.intervalo_tempo);
-    printf("%d\n", mobile_node.mips);
-    printf("%d\n", mobile_node.max_tempo);
+    char mensagem[BUFSIZE];
+    snprintf(mensagem,BUFSIZE,"%d",idTarefa);
+    strcat(mensagem,";");
+    strcat(mensagem,argv[1]);
+    strcat(mensagem,";");
+    strcat(mensagem,argv[4]);
+
+    int intervalo_tempo = atoi(argv[2]);
+    int mips = atoi(argv[3]);
+
+    // ID tarefa; Nº de instruções (em milhares); Tempo máximo para execução
+    write(fd, &mensagem,sizeof(mensagem));
+
+    printf("%d\n", idTarefa);
+    printf("%d\n", num_pedidos);
+    printf("%d\n", max_tempo);
+    printf("%d\n", intervalo_tempo);
+    printf("%d\n", mips);
 
     return 0;
 }

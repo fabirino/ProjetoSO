@@ -31,6 +31,10 @@ int main(int argc, char *argv[]) {
     shared_memory->sem_tarefas = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_ficheiro = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
 
+    // Semaforo para ler e escrever da Shared Memory
+    sem_unlink("SEM_SM");
+    sem_SM = sem_open("SEM_SM", O_CREAT | O_EXCL, 0700, 1);
+
     log_msg("O programa iniciou", 1);
 
     // cria o named pipe se ainda nao existe
@@ -38,7 +42,7 @@ int main(int argc, char *argv[]) {
         perror("Nao se pode criar o pipe:");
         exit(0);
     }
-    log_msg("Pipe iniciou", 0);
+    log_msg("O TASK_PIPE iniciou", 0);
 
     // Read config file
     char path[20];
@@ -64,7 +68,6 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    // Create message queue
     //  Create Message QUEUE
     if ((MQid = msgget(IPC_PRIVATE, IPC_CREAT | 0700)) == -1) {
         erro("Erro ao criar a Message Queue");
@@ -85,6 +88,40 @@ int main(int argc, char *argv[]) {
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {
         log_msg("O processo Maintenance Manager comecou", 0);
+
+        while(1){
+            // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
+            // como e que o edge server responde ao MM??????????
+            
+            time_t t;
+            srand((unsigned)time(&t));
+
+            int tempo = random() % 5 + 1;
+
+            int servidor = random() % shared_memory->EDGE_SERVER_NUMBER;
+
+
+            int existe = 0;
+
+             for (int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
+                if (shared_memory->servers[i].em_manutencao){
+                    existe = 1;
+                }
+            }
+            if(!existe){
+                shared_memory->servers[servidor].em_manutencao = 1;
+                char temp[BUFSIZE];
+                snprintf(temp, BUFSIZE, "O Edge Server %d entrou em manutencao", servidor + 1);
+                //sleep(tempo);
+
+                shared_memory->servers[servidor].manutencoes +=1;
+
+                tempo = random() % 5 + 1;
+                //sleep(tempo);
+            }
+
+
+        }
 
         exit(0);
     }

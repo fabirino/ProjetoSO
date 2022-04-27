@@ -19,6 +19,9 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 
 #define BUFSIZE 1024
 #define PIPE_NAME "TASK_PIPE"
@@ -29,15 +32,13 @@ typedef struct {
     /* Message type */
     long priority;
     /* Payload */
-    int msg_number;
+    int msg_number; // TODO: usar este numero para saber quantas tarefas estao por terminar quando o programa acabar
 } priority_msg;
 
 typedef struct Mobile_Node {
+    int idTarefa;
     int num_pedidos;
-    int intervalo_tempo;
-    int mips;
     int max_tempo;
-
 } MN;
 
 typedef struct {
@@ -48,6 +49,11 @@ typedef struct {
     pid_t pid;
     pthread_t vCPU[2];       // Usar em modo High Performance
     pthread_mutex_t mutex;   // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
+
+    int em_manutencao; // Modo Stopped
+    int tarefas_executadas;
+    int manutencoes;
+
 } Edge_Server;
 
 
@@ -66,8 +72,8 @@ typedef struct shared_memory {
     sem_t *sem_ficheiro;   // nao haverem 2 processos a escreverem no log ao mesmo tempo
 
     int CPU_ativos;
-    // funcao colocar da FIFO ira verificar se a capacidade da lista esta acima de 80%
-    // funcao retirar da FIFO ira verificar se a capacidade da lista esta abaixo de 20%
+    int tarefas_descartadas;
+
 } SM;
 
 typedef struct{

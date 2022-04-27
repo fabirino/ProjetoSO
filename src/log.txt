@@ -1,14 +1,1 @@
-15:23:45 O programa iniciou
-15:23:45 O processo Maintenance Manager comecou
-15:23:45 O processo Task Manager comecou
-15:23:45 Criação da thread scheduler
-15:23:45 O processo Monitor comecou
-15:23:45 Edge server 1 arrancou
-15:23:45 CPU 1 do Edge Server SERVER_1 arrancou com capacidade de 100
-15:23:45 CPU 2 do Edge Server SERVER_1 arrancou com capacidade de 200
-15:23:45 Edge server 2 arrancou
-15:23:45 CPU 1 do Edge Server SERVER_2 arrancou com capacidade de 150
-15:23:45 CPU 2 do Edge Server SERVER_2 arrancou com capacidade de 200
-15:23:45 Edge server 3 arrancou
-15:23:45 CPU 1 do Edge Server SERVER_3 arrancou com capacidade de 180
-15:23:45 CPU 2 do Edge Server SERVER_3 arrancou com capacidade de 200
+17:52:40 O programa iniciou

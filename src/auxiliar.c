@@ -1,11 +1,6 @@
 // Eduardo Figueiredo 2020213717
 // Fábio Santos 2020212310
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
 #include "auxiliar.h"
 
 // devolve o tempo formatado
@@ -103,6 +98,8 @@ void createEdgeServers(char *path) {
             while (token != NULL) {
                 if (n == 0) {
                     strcpy(shared_memory->servers[i].nome, token);
+                    shared_memory->servers[i].manutencoes = 0;
+                    shared_memory->servers[i].tarefas_executadas = 0;
                     n++;
                 }
 
@@ -129,6 +126,49 @@ void createEdgeServers(char *path) {
 
 void *p_scheduler() { // gestão do escalonamento das tarefas
     // TODO:code here
+     // Abrir pipe para ler
+    int fd;
+    if ((fd = open(PIPE_NAME, O_RDWR)) < 0) {
+        perror("Nao pode abrir o pipe para ler:");
+        exit(0);
+    }
+
+    //-------------------------
+    while (1) {
+        MN mobile_node;
+        int r;
+        char mensagem[BUFSIZE];
+        r = read(fd, &mensagem, sizeof(mensagem));
+        if (r < 0)
+            perror("Named Pipe");
+        int kappa = 0;
+        char *token;
+        token = strtok(mensagem, ";");
+        
+        while (token != NULL) {
+            if (!strcmp(token, "EXIT") && kappa ==0) {
+                // Acaba o programa
+                SIGINT_HANDLER(1);
+                break;
+            } else if (!strcmp(token, "STATS") && kappa ==0) {
+                // Imprime as estatisticas
+                SIGTSTP_HANDLER(1);
+                break;
+            }else{
+                if(kappa == 0)
+                    mobile_node.idTarefa = atoi(token);
+                else if(kappa == 1)
+                    mobile_node.num_pedidos = atoi(token);
+                else
+                    mobile_node.max_tempo = atoi(token);
+                kappa ++;
+            }
+            token = strtok(NULL, ";");
+        }
+        if (kappa != 0)
+            printf("[SERVER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
+                r, mobile_node.idTarefa, mobile_node.num_pedidos, mobile_node.max_tempo);
+    }
     pthread_exit(NULL);
 }
 
@@ -152,29 +192,15 @@ void task_menager() {
         }
     }
 
-    // Abrir pipe para ler
-    int fd;
-    if ((fd = open(PIPE_NAME, O_RDWR)) < 0) {
-        perror("Nao pode abrir o pipe para ler:");
-        exit(0);
-    }
-
-    //-------------------------
-    //DEBUG: acho que isto faz-se na thread schedular! DUVIDAS NESTA PARTE POR ISSO FICA POR AQUI xD
-    int r;
-    r = read(fd, &n, sizeof(numbers));
-    if (r < 0)
-        perror("Named Pipe");
-    printf("[SERVER] Read %d bytes: reveived (%d,%d), adding it: %d\n",
-           r, n.a, n.b, n.a + n.b);
-    //----------------------------
-
+   
+    // Criação da thread scheduler
     pthread_t scheduler;
     pthread_create(&scheduler, NULL, p_scheduler, NULL); // Criação da thread scheduler
     memset(teste, 0, 100);
     snprintf(teste, 100, "Criação da thread scheduler");
     log_msg(teste, 0);
 
+    // Criação da thread dispatcher
     pthread_t dispatcher;
     pthread_create(&dispatcher, NULL, p_dispatcher, NULL); // Criação da thread dispatcher
     memset(teste, 0, 100);
@@ -222,7 +248,29 @@ void SIGTSTP_HANDLER(int signum) {
 
     printf("------Estatisticas------\n");
 
-    // TODO: descobrir que estatisticas imprimir
+    // Total de tarefas executadas
+    int count = 0;
+    for(int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
+        count += shared_memory->servers[i].tarefas_executadas;
+    }
+    printf("Total de tarefas executadas: %d\n", count);
+
+    // Tempo medio de cada tarefa
+    // TODO:
+
+    // Numero de tarefas executadas por cada E Server
+    for(int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
+        printf("Tarefas executadas pelo Edge Server %d: %d\n", i, shared_memory->servers[i].tarefas_executadas);
+    }
+
+    // Numero de manutencoes de cada E Sever
+    for(int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
+        printf("Numero de manutencoes do Edge Server %d: %d\n", i, shared_memory->servers[i].manutencoes);
+    }
+
+    // Num de tarefas nao executadas
+    printf("Numero de tarefas nao executadas: %d", shared_memory->tarefas_descartadas);
+
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
@@ -234,8 +282,11 @@ void SIGINT_HANDLER(int signum) { // TODO: terminar a MQ
         pthread_join(shared_memory->servers[i].vCPU[1], NULL);
     }
 
-    // MQ
-    // msgctl(shared_memory->mqid)
+    // TODO: terminar a MQ
+    msgctl(MQid, IPC_RMID, 0);
+
+    /* Guarantees that every process receives a SIGTERM , to kill them */
+    kill(0, SIGTERM);
 
     // Fechar os semaforos
     sem_close(shared_memory->sem_manutencao);
@@ -244,7 +295,9 @@ void SIGINT_HANDLER(int signum) { // TODO: terminar a MQ
     sem_unlink("SEM_MANUTENCAO");
     sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
-    exit(0);
+    sem_close(sem_SM);
+    sem_unlink("SEM_SM");
 
     log_msg("O programa terminou\n", 0);
+    exit(0);
 }
