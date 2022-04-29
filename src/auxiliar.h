@@ -129,7 +129,7 @@ void SIGTSTP_HANDLER(int signum);
 
 void SIGINT_HANDLER(int signum);
 
-void task_menager(base *MQ);
+void task_manager(base *MQ);
 
 void Server(int i);
 

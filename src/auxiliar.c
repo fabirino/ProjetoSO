@@ -209,9 +209,9 @@ void reoorganizar(base *pf, time_t tempo) {
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
-void *p_scheduler(void *argumentos) { // gestão do escalonamento das tarefas
+void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
     // TODO: code here
-    base *MQ = argumentos;
+    base *MQ = lista;
 
     // Abrir pipe para ler
     int fd;
@@ -258,19 +258,24 @@ void *p_scheduler(void *argumentos) { // gestão do escalonamento das tarefas
             printf("[SERVER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
                    r, tarefa.idTarefa, tarefa.num_pedidos, tarefa.max_tempo);
 
-            colocar(MQ, tarefa, tarefa.max_tempo);
-            MQ->tam++;
+            colocar(MQ, tarefa, tarefa.max_tempo);//TODO: aco colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda  
+            MQ->tam++;                            //tem tempo para executar as tarefas,diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
         }
     }
     pthread_exit(NULL);
 }
 
-void *p_dispatcher() { // distribuição das tarefas
+void *p_dispatcher(void *lista) { // distribuição das tarefas
+
+    base *MQ = lista;
     // TODO: code here
 
     //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=
     Task received_msg; // DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!! ESTA A FUNCIONAR A ORDEM
-    // FIXME: DUVIDAA: este codigo ja nao vai funcionar pq trocarmos a mq pela maneta certo?
+    // QUESTION: este codigo ja nao vai funcionar pq trocarmos a mq pela maneta certo?
+    // ANSWER: Aqui vamos ter que usar semafros e variaveis para quando um server estiver livre, este enviar uma tarefa para fazer por unamed pip,
+    //ANTES de enviar verifica se ainda tem tempo para executar a tarefa, se nao tiver elimina-a da fila e escreve na log, caso tenha envia.
+    
     // while (1) {
     //     /* TO COMPLETE: Receive messages with the higher priority available */
     //     msgrcv(MQid, &received_msg, sizeof(priority_msg),-10000 , 0);
@@ -285,7 +290,7 @@ void *p_dispatcher() { // distribuição das tarefas
 }
 
 // Funcao encarregue de executar as tarefas de cada E-Server
-void Server(int i) {
+void Server(int i) {//TODO: recebe por um unamed pipe a tarefa a executar e se tiver em modo performace divide a tarefa pelas 2 threads,se tiver em modo 1 executa-a com 1 thread!
     char mensagem[200];
     argumentos aux;
     for (int v = 0; v < 2; v++) {
@@ -308,7 +313,7 @@ void Server(int i) {
     }
 }
 
-void task_menager(base *MQ) {
+void task_manager(base *MQ) {
     // Criar um processo para cada Edge Server
     char teste[100];
     memset(teste, 0, 100);
@@ -323,26 +328,23 @@ void task_menager(base *MQ) {
     }
 
     // Criação da thread scheduler
-    pthread_t scheduler;                                         // Aqui coloquei a MQ como argumento para funcionar
-    pthread_create(&scheduler, NULL, p_scheduler, (void *) &MQ); // Criação da thread scheduler 
+    pthread_t scheduler;                                        // Aqui coloquei a MQ como argumento para funcionar
+    pthread_create(&scheduler, NULL, p_scheduler, (void *)&MQ); // Criação da thread scheduler
     log_msg("Criação da thread scheduler", 0);
 
     // Criação da thread dispatcher
     pthread_t dispatcher;
-    pthread_create(&dispatcher, NULL, p_dispatcher, NULL); // Criação da thread dispatcher
+    pthread_create(&dispatcher, NULL, p_dispatcher, (void *)&MQ); // Criação da thread dispatcher
     log_msg("Criação da thread dispatcher", 0);
 
     pthread_join(scheduler, NULL);
     pthread_join(dispatcher, NULL);
 }
 
-
 // Funcao encarregue de executar as tarefas do Edge Server
 void *ES_routine(void *t) {
     argumentos aux = *(argumentos *)t;
     // printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
-
-
 
     pthread_exit(NULL);
 }
@@ -377,13 +379,15 @@ void SIGTSTP_HANDLER(int signum) {
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
-void SIGINT_HANDLER(int signum) { // FIXME: esta a dar um SEGFAULT AQUI
+void SIGINT_HANDLER(int signum) { 
+//TODO: tem que esperar pelas tarefas que estas a ser executas pelos edge servers acabares!!
 
-    // Esperar que as threads dos Edge Servers terminem
-    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        pthread_join(shared_memory->servers[i].vCPU[0], NULL);
-        pthread_join(shared_memory->servers[i].vCPU[1], NULL);
-    }
+    //DEBUG: nao pode ser desta maneira, uma ideia é ter um array na shared memory em que 0 esta a funcionar e 1 esta ligado e verificar se estao a 0 e nao deixar comecar mais tarefas!!
+    // // Esperar que as threads dos Edge Servers terminem
+    // for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+    //     pthread_join(shared_memory->servers[i].vCPU[0], NULL);
+    //     pthread_join(shared_memory->servers[i].vCPU[1], NULL);
+    // }
 
     // TODO: terminar a MQ
     msgctl(MQid, IPC_RMID, 0);

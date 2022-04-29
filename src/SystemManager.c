@@ -33,9 +33,9 @@ int main(int argc, char *argv[]) {
 
     // Variavel de condicao e semaforo TODO: testando da para alterar a variavel de condicao noutro processo
     pthread_mutexattr_t mattr;
-	pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
-	pthread_condattr_t cattr;
-	pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
+    pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+    pthread_condattr_t cattr;
+    pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
 
     pthread_mutex_init(&shared_memory->pthread_sem, &mattr);
     pthread_cond_init(&shared_memory->pthread_cond, &cattr);
@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
 
     // cria o named pipe se ainda nao existe
     if ((mkfifo(PIPE_NAME, O_CREAT | O_EXCL | 0600) < 0) && (errno != EEXIST)) {
-        perror("Nao se pode criar o pipe:");  
+        perror("Nao se pode criar o pipe:");
         exit(0);
     }
     log_msg("O TASK_PIPE iniciou", 0);
@@ -72,12 +72,6 @@ int main(int argc, char *argv[]) {
         erro("Erro ao criar a Message Queue");
     }
 
-    // criar a message queue interna a la maneta !!
-    base *MQ;
-    MQ->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
-    // FIXME: o programa nao funciona a partir daqui!!!!!!!!!
-    inicializar(MQ, shared_memory->QUEUE_POS);
-
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
@@ -86,7 +80,6 @@ int main(int argc, char *argv[]) {
         //     // FIXME: o tempo vai ser o tempo das tarefas, alterar mais tarde
         //     int tempo=5; // MAX_WAIT esta a 5, ou seja a condicao de baixo verifica-se sempre
         //     if(MQ->tam >= shared_memory->QUEUE_POS && tempo >= shared_memory->MAX_WAIT){
-
 
         //     }
         // }
@@ -98,7 +91,13 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
 
-        task_menager(MQ);
+        // criar a message queue interna a la maneta !!
+        base *MQ;
+        MQ->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
+
+        inicializar(MQ, shared_memory->QUEUE_POS);
+
+        task_manager(MQ);
 
         while (wait(NULL) > 0)
             ;
@@ -113,14 +112,13 @@ int main(int argc, char *argv[]) {
         // while(1){//BUG: QUANDO COLOCA-SE ESTE WHILE FICA TODO LAGADO A VM!!!!!!! RESORVER NS COMO
         //     // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
         //     // como e que o edge server responde ao MM??????????
-            
+
         //     time_t t;
         //     srand((unsigned)time(&t));
 
         //     int tempo = random() % 5 + 1;
 
         //     int servidor = random() % shared_memory->EDGE_SERVER_NUMBER;
-
 
         //     int existe = 0;
 
@@ -140,7 +138,6 @@ int main(int argc, char *argv[]) {
         //         tempo = random() % 5 + 1;
         //         //sleep(tempo);
         //     }
-
 
         // }
 
