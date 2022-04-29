@@ -125,7 +125,8 @@ void createEdgeServers(char *path) {
 }
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
-void inicializar(base *pf,int tamanho) {
+
+void inicializar(base *pf, int tamanho) {
     pf->tam = tamanho;
     // a fila está inicialmente vazia
     pf->entrada_lista = tamanho - 1;
@@ -135,17 +136,18 @@ void inicializar(base *pf,int tamanho) {
 
 bool colocar(base *pf, Task tarefa, int prioridade) {
     int i, anterior, prox;
-    //Procurar uma posição disponível
-    for (i = pf->tam - 1; i >= 0 && pf->nos[i].ocupado; i--);
+    // Procurar uma posição disponível
+    for (i = pf->tam - 1; i >= 0 && pf->nos[i].ocupado; i--)
+        ;
     if (i < 0) {
-        //fila cheia - não é possível inserir mais nada
+        // fila cheia - não é possível inserir mais nada
         return false;
     }
-    //colocar mensagem na fila
+    // colocar mensagem na fila
     pf->nos[i].tarefa = tarefa;
     pf->nos[i].prioridade = prioridade;
 
-    //Procurar a posição onde a mensagem deve ficar
+    // Procurar a posição onde a mensagem deve ficar
     if (!(pf->nos[pf->entrada_lista].ocupado)) {
         // fila vazia, inserir primeira mensagem
         pf->entrada_lista = i;
@@ -201,16 +203,15 @@ bool retirar(base *pf, Task *ptarefa) {
     return true;
 }
 
-void reoorganizar(base *pf,time_t tempo){
-    //code here/*
-
+void reoorganizar(base *pf, time_t tempo) {
+    // code here/*
 }
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
-
-void *p_scheduler() { // gestão do escalonamento das tarefas
-    // TODO:code here
+void *p_scheduler(void *argumentos) { // gestão do escalonamento das tarefas
+    // TODO: code here
+    base *MQ = argumentos;
 
     // Abrir pipe para ler
     int fd;
@@ -241,8 +242,10 @@ void *p_scheduler() { // gestão do escalonamento das tarefas
                 SIGTSTP_HANDLER(1);
                 break;
             } else {
+
                 if (kappa == 0)
                     tarefa.idTarefa = atoi(token);
+
                 else if (kappa == 1)
                     tarefa.num_pedidos = atoi(token);
                 else
@@ -254,8 +257,9 @@ void *p_scheduler() { // gestão do escalonamento das tarefas
         if (kappa != 0) {
             printf("[SERVER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
                    r, tarefa.idTarefa, tarefa.num_pedidos, tarefa.max_tempo);
-            colocar(&MQ,tarefa,tarefa.max_tempo);
-            MQ.tam++;
+
+            colocar(MQ, tarefa, tarefa.max_tempo);
+            MQ->tam++;
         }
     }
     pthread_exit(NULL);
@@ -265,7 +269,7 @@ void *p_dispatcher() { // distribuição das tarefas
     // TODO:code here
 
     //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=
-    Task received_msg;//DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!! ESSTA A FUNCIONAR A ORDEM
+    Task received_msg; // DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!! ESTA A FUNCIONAR A ORDEM
     // while (1) {
     //     /* TO COMPLETE: Receive messages with the higher priority available */
     //     msgrcv(MQid, &received_msg, sizeof(priority_msg),-10000 , 0);
@@ -280,11 +284,10 @@ void *p_dispatcher() { // distribuição das tarefas
 }
 
 void task_menager() {
-
-    //criar a message queue interna a la maneta !!
-    base * MQ;
-    MQ->nos = (base *) malloc(sizeof(base)*shared_memory->QUEUE_POS);
-    inicializar(&MQ,shared_memory->QUEUE_POS);
+    // criar a message queue interna a la maneta !!
+    base *MQ;
+    MQ->nos = (no_fila *)malloc(sizeof(base) * shared_memory->QUEUE_POS);
+    inicializar(MQ, shared_memory->QUEUE_POS);
 
     // Criar um processo para cada Edge Server
     char teste[100];
@@ -300,22 +303,20 @@ void task_menager() {
     }
 
     // Criação da thread scheduler
-    pthread_t scheduler;
-    snprintf(teste, 100, "Criação da thread scheduler");
-    pthread_create(&scheduler, NULL, p_scheduler, NULL); // Criação da thread scheduler
-    memset(teste, 0, 100);
-    log_msg(teste, 0);
+    pthread_t scheduler;                                         // Aqui coloquei a MQ como argumento para funcionar
+    pthread_create(&scheduler, NULL, p_scheduler, (void *) &MQ); // Criação da thread scheduler 
+    log_msg("Criação da thread scheduler", 0);
 
     // Criação da thread dispatcher
     pthread_t dispatcher;
-    snprintf(teste, 100, "Criação da thread dispatcher");
     pthread_create(&dispatcher, NULL, p_dispatcher, NULL); // Criação da thread dispatcher
-    memset(teste, 0, 100);
-    log_msg(teste, 0);
+    log_msg("Criação da thread dispatcher", 0);
 
     pthread_join(scheduler, NULL);
     pthread_join(dispatcher, NULL);
 }
+
+
 
 // Funcao encarregue de executar as tarefas de cada E-Server
 void Server(int i) {
@@ -333,7 +334,7 @@ void Server(int i) {
         aux->n_vcpu = v + 1;
         snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
         log_msg(mensagem, 0);
-        pthread_create(&shared_memory->servers[i].vCPU[v], NULL, function, (void *)aux);
+        pthread_create(&shared_memory->servers[i].vCPU[v], NULL, ES_routine, (void *)aux);
         memset(mensagem, 0, 200);
     }
     for (int j = 0; j < 2; j++) {
@@ -342,7 +343,7 @@ void Server(int i) {
 }
 
 // Funcao encarregue de executar as tarefas do Edge Server
-void *function(void *t) {
+void *ES_routine(void *t) {
     argumentos aux = *(argumentos *)t;
     // printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
 
@@ -403,9 +404,9 @@ void SIGINT_HANDLER(int signum) { // TODO: terminar a MQ
     sem_close(shared_memory->sem_SM);
     sem_unlink("SEM_SM");
 
-    kill(shared_memory->maintenance_pid,SIGKILL);
-    kill(shared_memory->monitor_pid,SIGKILL);
-    kill(shared_memory->TM_pid,SIGKILL);
+    kill(shared_memory->maintenance_pid, SIGKILL);
+    kill(shared_memory->monitor_pid, SIGKILL);
+    kill(shared_memory->TM_pid, SIGKILL);
 
     log_msg("O programa terminou\n", 0);
     exit(0);

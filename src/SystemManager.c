@@ -50,9 +50,10 @@ int main(int argc, char *argv[]) {
     config(path);
     shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
     createEdgeServers(path);
-    for (int p = 0; p < shared_memory->EDGE_SERVER_NUMBER; p++) {
-        printf("%s\n", shared_memory->servers[p].nome);
-    }
+    // DEBUG:
+    // for (int p = 0; p < shared_memory->EDGE_SERVER_NUMBER; p++) {
+    //     printf("%s\n", shared_memory->servers[p].nome);
+    // }
 
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -60,16 +61,16 @@ int main(int argc, char *argv[]) {
     signal(SIGTSTP, SIGTSTP_HANDLER);
     signal(SIGINT, SIGINT_HANDLER);
 
+    //  Create Message QUEUE
+    if ((MQid = msgget(IPC_PRIVATE, IPC_CREAT | 0700)) == -1) {
+        erro("Erro ao criar a Message Queue");
+    }
+
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
 
         exit(0);
-    }
-
-    //  Create Message QUEUE
-    if ((MQid = msgget(IPC_PRIVATE, IPC_CREAT | 0700)) == -1) {
-        erro("Erro ao criar a Message Queue");
     }
 
     // Task Manager ========================================================================

@@ -129,6 +129,6 @@ void task_menager();
 
 void Server(int i);
 
-void *function(void *t);
+void *ES_routine(void *t);
 
 #endif

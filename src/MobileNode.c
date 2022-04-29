@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
         strcat(mensagem, argv[3]);
         strcat(mensagem, ";");
         strcat(mensagem, argv[4]);
+        
         write(fd, &mensagem, sizeof(mensagem));
         sleep(intervalo_tempo);
     }
