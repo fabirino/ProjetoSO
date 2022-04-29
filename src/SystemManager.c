@@ -37,8 +37,8 @@ int main(int argc, char *argv[]) {
 	pthread_condattr_t cattr;
 	pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
 
-    pthread_mutex_init(&pthread_sem, &mattr);
-    pthread_cond_init(&pthread_cond, &cattr);
+    pthread_mutex_init(&shared_memory->pthread_sem, &mattr);
+    pthread_cond_init(&shared_memory->pthread_cond, &cattr);
 
     log_msg("O programa iniciou", 1);
 

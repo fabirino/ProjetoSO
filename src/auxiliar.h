@@ -99,6 +99,9 @@ typedef struct shared_memory {
     sem_t *sem_ficheiro;   // nao haverem 2 processos a escreverem no log ao mesmo tempo
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
 
+    pthread_mutex_t pthread_sem;    // semaforo para as threads
+    pthread_cond_t pthread_cond;    // variavel de condicao que muda de Normal para HP
+
     int CPU_ativos;
     int tarefas_descartadas;
 
@@ -111,9 +114,6 @@ typedef struct {
 } argumentos;
 
 SM *shared_memory;
-
-pthread_mutex_t pthread_sem;
-pthread_cond_t pthread_cond;
 
 void erro(char *msg);
 
