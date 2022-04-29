@@ -8,9 +8,6 @@
 // TODO: semafro para aceder a dados da memoria partilhada!!
 // TODO: protecoes no config file(verificar se é inteiro ou string)
 
-// pthread_mutex_t semaforo = PTHREAD_MUTEX_INITIALIZER;
-// pthread_cond_t condicao = PTHREAD_COND_INITIALIZER;
-
 int main(int argc, char *argv[]) {
 
     if (argc != 2) {
@@ -31,8 +28,17 @@ int main(int argc, char *argv[]) {
     shared_memory->sem_manutencao = sem_open("SEM_MANUTENCAO", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_tarefas = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_ficheiro = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
-        // Semaforo para ler e escrever da Shared Memory
+    // Semaforo para ler e escrever da Shared Memory
     shared_memory->sem_SM = sem_open("SEM_SM", O_CREAT | O_EXCL, 0700, 1);
+
+    // Variavel de condicao e semaforo TODO: testando da para alterar a variavel de condicao noutro processo
+    pthread_mutexattr_t mattr;
+	pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+	pthread_condattr_t cattr;
+	pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
+
+    pthread_mutex_init(&pthread_sem, &mattr);
+    pthread_cond_init(&pthread_cond, &cattr);
 
     log_msg("O programa iniciou", 1);
 
@@ -66,9 +72,24 @@ int main(int argc, char *argv[]) {
         erro("Erro ao criar a Message Queue");
     }
 
+    // criar a message queue interna a la maneta !!
+    base *MQ;
+    MQ->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
+    // FIXME: o programa nao funciona a partir daqui!!!!!!!!!
+    inicializar(MQ, shared_memory->QUEUE_POS);
+
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
+
+        // while(1){
+        //     // FIXME: o tempo vai ser o tempo das tarefas, alterar mais tarde
+        //     int tempo=5; // MAX_WAIT esta a 5, ou seja a condicao de baixo verifica-se sempre
+        //     if(MQ->tam >= shared_memory->QUEUE_POS && tempo >= shared_memory->MAX_WAIT){
+
+
+        //     }
+        // }
 
         exit(0);
     }
@@ -77,7 +98,7 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
 
-        task_menager();
+        task_menager(MQ);
 
         while (wait(NULL) > 0)
             ;

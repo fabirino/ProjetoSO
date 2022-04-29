@@ -266,10 +266,11 @@ void *p_scheduler(void *argumentos) { // gestão do escalonamento das tarefas
 }
 
 void *p_dispatcher() { // distribuição das tarefas
-    // TODO:code here
+    // TODO: code here
 
     //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=
     Task received_msg; // DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!! ESTA A FUNCIONAR A ORDEM
+    // FIXME: DUVIDAA: este codigo ja nao vai funcionar pq trocarmos a mq pela maneta certo?
     // while (1) {
     //     /* TO COMPLETE: Receive messages with the higher priority available */
     //     msgrcv(MQid, &received_msg, sizeof(priority_msg),-10000 , 0);
@@ -283,12 +284,31 @@ void *p_dispatcher() { // distribuição das tarefas
     pthread_exit(NULL);
 }
 
-void task_menager() {
-    // criar a message queue interna a la maneta !!
-    base *MQ;
-    MQ->nos = (no_fila *)malloc(sizeof(base) * shared_memory->QUEUE_POS);
-    inicializar(MQ, shared_memory->QUEUE_POS);
+// Funcao encarregue de executar as tarefas de cada E-Server
+void Server(int i) {
+    char mensagem[200];
+    argumentos aux;
+    for (int v = 0; v < 2; v++) {
+        argumentos *aux = (argumentos *)malloc(sizeof(argumentos));
+        strcpy(aux->nome_server, shared_memory->servers[i].nome);
+        if (v == 0) {
+            aux->capacidade_vcpu = shared_memory->servers[i].mips1;
+        }
+        if (v == 1) {
+            aux->capacidade_vcpu = shared_memory->servers[i].mips2;
+        }
+        aux->n_vcpu = v + 1;
+        snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
+        log_msg(mensagem, 0);
+        pthread_create(&shared_memory->servers[i].vCPU[v], NULL, ES_routine, (void *)aux);
+        memset(mensagem, 0, 200);
+    }
+    for (int j = 0; j < 2; j++) {
+        pthread_join(shared_memory->servers[i].vCPU[j], NULL);
+    }
+}
 
+void task_menager(base *MQ) {
     // Criar um processo para cada Edge Server
     char teste[100];
     memset(teste, 0, 100);
@@ -317,35 +337,12 @@ void task_menager() {
 }
 
 
-
-// Funcao encarregue de executar as tarefas de cada E-Server
-void Server(int i) {
-    char mensagem[200];
-    argumentos aux;
-    for (int v = 0; v < 2; v++) {
-        argumentos *aux = (argumentos *)malloc(sizeof(argumentos));
-        strcpy(aux->nome_server, shared_memory->servers[i].nome);
-        if (v == 0) {
-            aux->capacidade_vcpu = shared_memory->servers[i].mips1;
-        }
-        if (v == 1) {
-            aux->capacidade_vcpu = shared_memory->servers[i].mips2;
-        }
-        aux->n_vcpu = v + 1;
-        snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
-        log_msg(mensagem, 0);
-        pthread_create(&shared_memory->servers[i].vCPU[v], NULL, ES_routine, (void *)aux);
-        memset(mensagem, 0, 200);
-    }
-    for (int j = 0; j < 2; j++) {
-        pthread_join(shared_memory->servers[i].vCPU[j], NULL);
-    }
-}
-
 // Funcao encarregue de executar as tarefas do Edge Server
 void *ES_routine(void *t) {
     argumentos aux = *(argumentos *)t;
     // printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
+
+
 
     pthread_exit(NULL);
 }
@@ -380,7 +377,7 @@ void SIGTSTP_HANDLER(int signum) {
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
-void SIGINT_HANDLER(int signum) { // TODO: terminar a MQ
+void SIGINT_HANDLER(int signum) { // FIXME: esta a dar um SEGFAULT AQUI
 
     // Esperar que as threads dos Edge Servers terminem
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {

@@ -45,6 +45,7 @@ typedef struct {
     int idTarefa;
     int num_pedidos;
     int max_tempo;
+    int vCPU;   // saber qual thread e em combinacao com a pthread_cond para ativar o modo HP: ver ES_routine
 } Task;
 
 typedef struct {
@@ -111,6 +112,9 @@ typedef struct {
 
 SM *shared_memory;
 
+pthread_mutex_t pthread_sem;
+pthread_cond_t pthread_cond;
+
 void erro(char *msg);
 
 void time_now(char *string);
@@ -125,7 +129,7 @@ void SIGTSTP_HANDLER(int signum);
 
 void SIGINT_HANDLER(int signum);
 
-void task_menager();
+void task_menager(base *MQ);
 
 void Server(int i);
 
