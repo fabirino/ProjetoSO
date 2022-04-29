@@ -1,5 +1,5 @@
-//Eduardo Figueiredo 2020213717
-//Fábio Santos 2020212310
+// Eduardo Figueiredo 2020213717
+// Fábio Santos 2020212310
 
 #ifndef AUXILIAR_H
 #define AUXILIAR_H
@@ -14,14 +14,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 #include <sys/shm.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/stat.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
 
 #define BUFSIZE 1024
 #define PIPE_NAME "TASK_PIPE"
@@ -33,13 +33,40 @@ typedef struct {
     long priority;
     /* Payload */
     int msg_number; // TODO: usar este numero para saber quantas tarefas estao por terminar quando o programa acabar
-} priority_msg;
-
-typedef struct Mobile_Node {
+    // dados
     int idTarefa;
     int num_pedidos;
     int max_tempo;
-} MN;
+} priority_msg;
+
+//#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+typedef struct {
+    // dados
+    int idTarefa;
+    int num_pedidos;
+    int max_tempo;
+} Task;
+
+typedef struct {
+    Task tarefa;
+    bool ocupado;
+    int prioridade;
+    int mens_seguinte;
+} no_fila;
+
+typedef struct {
+    no_fila * nos; // dados
+    int tam;
+    int entrada_lista;
+} base;
+
+bool colocar(base *pf, Task tarefa, int prioridade);
+
+bool retirar(base *pf, Task *ptarefa);
+
+void inicializar(base *pf,int tamanho);
+
+//#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
 typedef struct {
     char nome[50];
@@ -47,15 +74,14 @@ typedef struct {
     int mips2;
 
     pid_t pid;
-    pthread_t vCPU[2];       // Usar em modo High Performance
-    pthread_mutex_t mutex;   // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
+    pthread_t vCPU[2];     // Usar em modo High Performance
+    pthread_mutex_t mutex; // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
 
     int em_manutencao; // Modo Stopped
     int tarefas_executadas;
     int manutencoes;
 
 } Edge_Server;
-
 
 typedef struct shared_memory {
     int QUEUE_POS;
@@ -70,17 +96,18 @@ typedef struct shared_memory {
     sem_t *sem_manutencao; // semaforo usado para parar os Edge Servers
     sem_t *sem_tarefas;    // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
     sem_t *sem_ficheiro;   // nao haverem 2 processos a escreverem no log ao mesmo tempo
+    sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
 
     int CPU_ativos;
     int tarefas_descartadas;
 
 } SM;
 
-typedef struct{
+typedef struct {
     int capacidade_vcpu;
     char nome_server[50];
     int n_vcpu;
-}argumentos;
+} argumentos;
 
 SM *shared_memory;
 
@@ -100,10 +127,8 @@ void SIGINT_HANDLER(int signum);
 
 void task_menager();
 
-void Server( int i);
+void Server(int i);
 
 void *function(void *t);
-
-
 
 #endif

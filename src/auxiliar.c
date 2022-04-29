@@ -124,9 +124,95 @@ void createEdgeServers(char *path) {
     fclose(fich);
 }
 
+//#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+void inicializar(base *pf,int tamanho) {
+    pf->tam = tamanho;
+    // a fila está inicialmente vazia
+    pf->entrada_lista = tamanho - 1;
+    for (int i = 0; i < tamanho; i++)
+        pf->nos[i].ocupado = false;
+}
+
+bool colocar(base *pf, Task tarefa, int prioridade) {
+    int i, anterior, prox;
+    //Procurar uma posição disponível
+    for (i = pf->tam - 1; i >= 0 && pf->nos[i].ocupado; i--);
+    if (i < 0) {
+        //fila cheia - não é possível inserir mais nada
+        return false;
+    }
+    //colocar mensagem na fila
+    pf->nos[i].tarefa = tarefa;
+    pf->nos[i].prioridade = prioridade;
+
+    //Procurar a posição onde a mensagem deve ficar
+    if (!(pf->nos[pf->entrada_lista].ocupado)) {
+        // fila vazia, inserir primeira mensagem
+        pf->entrada_lista = i;
+        pf->nos[i].mens_seguinte = -1;
+    } else {
+        // fila contém mensagens
+        if (pf->nos[pf->entrada_lista].prioridade >= prioridade) {
+            // inserir à entrada da lista
+            pf->nos[i].mens_seguinte = pf->entrada_lista;
+            pf->entrada_lista = i;
+        } else {
+            // procurar posição de inserção
+            anterior = pf->entrada_lista;
+            prox = pf->nos[pf->entrada_lista].mens_seguinte;
+            while (prox >= 0 && pf->nos[prox].prioridade < prioridade) {
+                anterior = prox;
+                prox = pf->nos[prox].mens_seguinte;
+            }
+            if (prox < 0) {
+                // inserir nos final da lista
+                pf->nos[anterior].mens_seguinte = i;
+                pf->nos[i].mens_seguinte = -1;
+            } else {
+                // inserir a meio da lista
+                pf->nos[anterior].mens_seguinte = i;
+                pf->nos[i].mens_seguinte = prox;
+            }
+        }
+    }
+    pf->nos[i].ocupado = true;
+    return true;
+}
+
+bool retirar(base *pf, Task *ptarefa) {
+    int i, j;
+    if (!pf->nos[pf->entrada_lista].ocupado) {
+        // lista vazia
+        return false;
+    }
+
+    //  Procurar a última mensagem da lista
+    j = -1;
+    for (i = pf->entrada_lista; pf->nos[i].mens_seguinte != -1; i = pf->nos[i].mens_seguinte)
+        j = i; // guardar a localização da mensagem anterior à que vai sair
+
+    if (j != -1)
+        // havia mais do que uma mensagem na lista
+        pf->nos[j].mens_seguinte = -1;
+
+    pf->nos[i].ocupado = false;
+    *ptarefa = pf->nos[i].tarefa;
+
+    return true;
+}
+
+void reoorganizar(base *pf,time_t tempo){
+    //code here/*
+
+}
+
+//#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+
+
 void *p_scheduler() { // gestão do escalonamento das tarefas
     // TODO:code here
-     // Abrir pipe para ler
+
+    // Abrir pipe para ler
     int fd;
     if ((fd = open(PIPE_NAME, O_RDWR)) < 0) {
         perror("Nao pode abrir o pipe para ler:");
@@ -135,7 +221,7 @@ void *p_scheduler() { // gestão do escalonamento das tarefas
 
     //-------------------------
     while (1) {
-        MN mobile_node;
+        Task tarefa;
         int r;
         char mensagem[BUFSIZE];
         r = read(fd, &mensagem, sizeof(mensagem));
@@ -144,40 +230,61 @@ void *p_scheduler() { // gestão do escalonamento das tarefas
         int kappa = 0;
         char *token;
         token = strtok(mensagem, ";");
-        
+
         while (token != NULL) {
-            if (!strcmp(token, "EXIT") && kappa ==0) {
+            if (!strcmp(token, "EXIT") && kappa == 0) {
                 // Acaba o programa
                 SIGINT_HANDLER(1);
                 break;
-            } else if (!strcmp(token, "STATS") && kappa ==0) {
+            } else if (!strcmp(token, "STATS") && kappa == 0) {
                 // Imprime as estatisticas
                 SIGTSTP_HANDLER(1);
                 break;
-            }else{
-                if(kappa == 0)
-                    mobile_node.idTarefa = atoi(token);
-                else if(kappa == 1)
-                    mobile_node.num_pedidos = atoi(token);
+            } else {
+                if (kappa == 0)
+                    tarefa.idTarefa = atoi(token);
+                else if (kappa == 1)
+                    tarefa.num_pedidos = atoi(token);
                 else
-                    mobile_node.max_tempo = atoi(token);
-                kappa ++;
+                    tarefa.max_tempo = atoi(token);
+                kappa++;
             }
             token = strtok(NULL, ";");
         }
-        if (kappa != 0)
+        if (kappa != 0) {
             printf("[SERVER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
-                r, mobile_node.idTarefa, mobile_node.num_pedidos, mobile_node.max_tempo);
+                   r, tarefa.idTarefa, tarefa.num_pedidos, tarefa.max_tempo);
+            colocar(&MQ,tarefa,tarefa.max_tempo);
+            MQ.tam++;
+        }
     }
     pthread_exit(NULL);
 }
 
 void *p_dispatcher() { // distribuição das tarefas
     // TODO:code here
+
+    //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=
+    Task received_msg;//DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!! ESSTA A FUNCIONAR A ORDEM
+    // while (1) {
+    //     /* TO COMPLETE: Receive messages with the higher priority available */
+    //     msgrcv(MQid, &received_msg, sizeof(priority_msg),-10000 , 0);
+    //     /* TO COMPLETE: end */
+
+    //     printf("[high_priority_first] Received message [%d]!\n", received_msg.msg_number);
+    //     sleep(5);
+    // }
+    //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=
+
     pthread_exit(NULL);
 }
 
 void task_menager() {
+
+    //criar a message queue interna a la maneta !!
+    base * MQ;
+    MQ->nos = (base *) malloc(sizeof(base)*shared_memory->QUEUE_POS);
+    inicializar(&MQ,shared_memory->QUEUE_POS);
 
     // Criar um processo para cada Edge Server
     char teste[100];
@@ -192,19 +299,18 @@ void task_menager() {
         }
     }
 
-   
     // Criação da thread scheduler
     pthread_t scheduler;
+    snprintf(teste, 100, "Criação da thread scheduler");
     pthread_create(&scheduler, NULL, p_scheduler, NULL); // Criação da thread scheduler
     memset(teste, 0, 100);
-    snprintf(teste, 100, "Criação da thread scheduler");
     log_msg(teste, 0);
 
     // Criação da thread dispatcher
     pthread_t dispatcher;
+    snprintf(teste, 100, "Criação da thread dispatcher");
     pthread_create(&dispatcher, NULL, p_dispatcher, NULL); // Criação da thread dispatcher
     memset(teste, 0, 100);
-    snprintf(teste, 100, "Criação da thread dispatcher");
     log_msg(teste, 0);
 
     pthread_join(scheduler, NULL);
@@ -250,7 +356,7 @@ void SIGTSTP_HANDLER(int signum) {
 
     // Total de tarefas executadas
     int count = 0;
-    for(int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         count += shared_memory->servers[i].tarefas_executadas;
     }
     printf("Total de tarefas executadas: %d\n", count);
@@ -259,18 +365,17 @@ void SIGTSTP_HANDLER(int signum) {
     // TODO:
 
     // Numero de tarefas executadas por cada E Server
-    for(int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         printf("Tarefas executadas pelo Edge Server %d: %d\n", i, shared_memory->servers[i].tarefas_executadas);
     }
 
     // Numero de manutencoes de cada E Sever
-    for(int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         printf("Numero de manutencoes do Edge Server %d: %d\n", i, shared_memory->servers[i].manutencoes);
     }
 
     // Num de tarefas nao executadas
     printf("Numero de tarefas nao executadas: %d", shared_memory->tarefas_descartadas);
-
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
@@ -295,8 +400,12 @@ void SIGINT_HANDLER(int signum) { // TODO: terminar a MQ
     sem_unlink("SEM_MANUTENCAO");
     sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
-    sem_close(sem_SM);
+    sem_close(shared_memory->sem_SM);
     sem_unlink("SEM_SM");
+
+    kill(shared_memory->maintenance_pid,SIGKILL);
+    kill(shared_memory->monitor_pid,SIGKILL);
+    kill(shared_memory->TM_pid,SIGKILL);
 
     log_msg("O programa terminou\n", 0);
     exit(0);
