@@ -89,6 +89,8 @@ typedef struct {
     int tarefas_executadas;
     int manutencoes;
 
+    int fd[2];
+
 } Edge_Server;
 
 typedef struct shared_memory {
@@ -108,8 +110,6 @@ typedef struct shared_memory {
 
     pthread_mutex_t pthread_sem;    // semaforo para as threads
     pthread_cond_t pthread_cond;    // variavel de condicao que muda de Normal para HP
-
-    int **pipes_fd;
 
     int *ES_ativos;
     int Num_es_ativos; //numero de edge servers ativos!!

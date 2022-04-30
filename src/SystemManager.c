@@ -84,7 +84,6 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-
     // Task Manager ========================================================================
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
@@ -92,6 +91,14 @@ int main(int argc, char *argv[]) {
         // criar a message queue interna a la maneta !!
         base *MQ;
         MQ->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
+
+        // inicicalizar unnamed pipes
+        //FIXME: BUGADO!!!
+        for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+            if (pipe(shared_memory->servers[i].fd) != 0) {
+                erro("Erro ao criar os unnamed pipes!");
+            }
+        }
 
         inicializar(MQ, shared_memory->QUEUE_POS);
 

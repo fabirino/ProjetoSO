@@ -80,9 +80,6 @@ void config(char *path) {
     // Inicializar o array que mostra o numero de ES ativos
     shared_memory->ES_ativos = (int *)malloc(sizeof(int) * shared_memory->EDGE_SERVER_NUMBER);
     shared_memory->CPU_ativos = 1;
-    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        shared_memory->ES_ativos[i] = 0;
-    }
 }
 
 // funcao que cria os edge servers com base nos dados obtidos no ficheiro config
@@ -329,6 +326,19 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
     char mensagem[200];
     argumentos *aux = (argumentos *)malloc(sizeof(argumentos));
     aux->ES_num = i;
+    for (int v = 0; v < 2; v++) { // DEBUG: ver se colocamos isto no monitor !!
+        memset(mensagem, 0, 200);
+        strcpy(aux->nome_server, shared_memory->servers[i].nome);
+        if (v == 0) {
+            aux->capacidade_vcpu = shared_memory->servers[i].mips1;
+        }
+        if (v == 1) {
+            aux->capacidade_vcpu = shared_memory->servers[i].mips2;
+        }
+        aux->n_vcpu = v + 1;
+        snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
+        log_msg(mensagem, 0);
+    }
     while (1) {
         /* code */
         // TODO: ver a mq da manutencao para ver se tem mensagens!!
@@ -336,7 +346,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
 
         // receber a tarefa!
 
-        Task tarefa;
+        Task tarefa; // FIXME: LER PIPE
         // if (read(shared_memory->pipes_fd[i][0], &tarefa, sizeof(Task)) == -1) {
         //     perror("Erro ao ler do pipe");
         //     continue;
@@ -344,18 +354,11 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
         // FIXME:
         aux->idTarefa = 1;
         if (shared_memory->CPU_ativos == 1) { // TODO: mandar por parametros para a thread a task !!
-            int v;
             memset(mensagem, 0, 200);
             strcpy(aux->nome_server, shared_memory->servers[i].nome);
-            if (v == 0) {
-                aux->capacidade_vcpu = shared_memory->servers[i].mips1;
-            }
-            if (v == 1) {
-                aux->capacidade_vcpu = shared_memory->servers[i].mips2;
-            }
-            aux->n_vcpu = v + 1;
-            snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
-            log_msg(mensagem, 0);
+            aux->capacidade_vcpu = shared_memory->servers[i].mips1;
+
+            aux->n_vcpu = 1;
             pthread_create(&shared_memory->servers[i].vCPU[0], NULL, ES_routine, (void *)aux);
 
             pthread_join(shared_memory->servers[i].vCPU[0], NULL);
@@ -372,8 +375,6 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
                     aux->capacidade_vcpu = shared_memory->servers[i].mips2;
                 }
                 aux->n_vcpu = v + 1;
-                snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
-                log_msg(mensagem, 0);
                 pthread_create(&shared_memory->servers[i].vCPU[v], NULL, ES_routine, (void *)aux);
             }
 
@@ -389,6 +390,7 @@ void task_manager(base *MQ) {
     // Criar um processo para cada Edge Server
     char teste[100];
     memset(teste, 0, 100);
+
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         if ((shared_memory->servers[i].pid = fork()) == 0) {
             snprintf(teste, 100, "Edge server %d arrancou", i + 1);
@@ -418,6 +420,7 @@ void *ES_routine(void *t) {
     // printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
 
     // TODO: code here
+
     char mensagem[BUFSIZE];
     snprintf(mensagem, BUFSIZE, "SERVER_%d: Task %d completada", aux.ES_num, aux.idTarefa);
     log_msg(mensagem, 0);
@@ -490,8 +493,8 @@ void SIGINT_HANDLER(int signum) {
 
     // Close pipes
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        close(shared_memory->pipes_fd[i][0]);
-        close(shared_memory->pipes_fd[i][1]);
+        close(shared_memory->servers[i].fd[0]);
+        close(shared_memory->servers[i].fd[1]);
     }
 
     // Remove shared_memory
