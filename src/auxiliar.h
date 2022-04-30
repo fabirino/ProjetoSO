@@ -45,8 +45,15 @@ typedef struct {
     int idTarefa;
     int num_pedidos;
     int max_tempo;
-    int vCPU;   // saber qual thread e em combinacao com a pthread_cond para ativar o modo HP: ver ES_routine
 } Task;
+
+typedef struct {
+    int ES_num;
+    int idTarefa;   
+    int capacidade_vcpu;
+    char nome_server[50];
+    int n_vcpu;
+} argumentos;
 
 typedef struct {
     Task tarefa;
@@ -102,18 +109,18 @@ typedef struct shared_memory {
     pthread_mutex_t pthread_sem;    // semaforo para as threads
     pthread_cond_t pthread_cond;    // variavel de condicao que muda de Normal para HP
 
+    int **pipes_fd;
+
+    int *ES_ativos;
+    int Num_es_ativos; //numero de edge servers ativos!!
+
     int CPU_ativos;
     int tarefas_descartadas;
 
 } SM;
 
-typedef struct {
-    int capacidade_vcpu;
-    char nome_server[50];
-    int n_vcpu;
-} argumentos;
-
 SM *shared_memory;
+int shmid;
 
 void erro(char *msg);
 
@@ -131,7 +138,7 @@ void SIGINT_HANDLER(int signum);
 
 void task_manager(base *MQ);
 
-void Server(int i);
+void server(int i);
 
 void *ES_routine(void *t);
 

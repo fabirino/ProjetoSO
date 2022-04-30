@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Create shared memory
-    int shmid = shmget(IPC_PRIVATE, sizeof(SM), IPC_CREAT | 0766);
+    shmid = shmget(IPC_PRIVATE, sizeof(SM), IPC_CREAT | 0766);
 
     // Attach shared memory
     shared_memory = (SM *)shmat(shmid, NULL, 0);
@@ -54,12 +54,9 @@ int main(int argc, char *argv[]) {
     strcpy(path, argv[1]);
 
     config(path);
+    shared_memory->Num_es_ativos = 0;
     shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
     createEdgeServers(path);
-    // DEBUG:
-    // for (int p = 0; p < shared_memory->EDGE_SERVER_NUMBER; p++) {
-    //     printf("%s\n", shared_memory->servers[p].nome);
-    // }
 
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -87,6 +84,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+
     // Task Manager ========================================================================
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
@@ -104,6 +102,10 @@ int main(int argc, char *argv[]) {
 
         exit(0);
     }
+
+    // Ignorar os sinais nos seguintes processos para nao haver prints duplicados
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGINT, SIG_IGN);
 
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {

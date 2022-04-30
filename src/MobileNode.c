@@ -23,11 +23,11 @@ int main(int argc, char *argv[]) {
     srand((unsigned)time(&t));
 
     int idTarefa = random(); // TODO: ?????????
-    int num_pedidos = atoi(argv[1]);
+    int num_pedidos = atoi(argv[1]); //QUESTION: nao temos de multiplicar o numero de pedidos por 1000?
     int max_tempo = atoi(argv[4]);
 
 
-    int intervalo_tempo = atoi(argv[2]);
+    int intervalo_tempo = atoi(argv[2]); //QUESTION: e aqui multiplicar por 0.001 uma vez que sao em milisegundos
     int mips = atoi(argv[3]);
 
     // ID tarefa; Nº de instruções (em milhares); Tempo máximo para execução

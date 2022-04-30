@@ -76,6 +76,13 @@ void config(char *path) {
         exit(0);
     }
     fclose(fich);
+
+    // Inicializar o array que mostra o numero de ES ativos
+    shared_memory->ES_ativos = (int *)malloc(sizeof(int) * shared_memory->EDGE_SERVER_NUMBER);
+    shared_memory->CPU_ativos = 1;
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+        shared_memory->ES_ativos[i] = 0;
+    }
 }
 
 // funcao que cria os edge servers com base nos dados obtidos no ficheiro config
@@ -204,7 +211,7 @@ bool retirar(base *pf, Task *ptarefa) {
 }
 
 void reoorganizar(base *pf, time_t tempo) {
-    // code here/*
+    // TODO: code here/*
 }
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
@@ -235,14 +242,13 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
         while (token != NULL) {
             if (!strcmp(token, "EXIT") && kappa == 0) {
                 // Acaba o programa
-                SIGINT_HANDLER(1);
+                SIGINT_HANDLER;
                 break;
             } else if (!strcmp(token, "STATS") && kappa == 0) {
                 // Imprime as estatisticas
-                SIGTSTP_HANDLER(1);
+                SIGTSTP_HANDLER;
                 break;
             } else {
-
                 if (kappa == 0)
                     tarefa.idTarefa = atoi(token);
 
@@ -258,8 +264,15 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
             printf("[SERVER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
                    r, tarefa.idTarefa, tarefa.num_pedidos, tarefa.max_tempo);
 
-            colocar(MQ, tarefa, tarefa.max_tempo);//TODO: aco colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda  
-            MQ->tam++;                            //tem tempo para executar as tarefas,diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
+            colocar(MQ, tarefa, tarefa.max_tempo); // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
+            MQ->tam++;                             // tem tempo para executar as tarefas,diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
+        }
+
+        if (0) { // TODO: verificar se a condicao consegue ser executada no MAX_WAIT
+            char temp[BUFSIZE];
+            snprintf(temp, BUFSIZE, "SCHEDULER: Prazo maximo de execucao da tarefa %d atingido", tarefa.idTarefa);
+            log_msg(temp, 0);
+            shared_memory->tarefas_descartadas++;
         }
     }
     pthread_exit(NULL);
@@ -271,11 +284,33 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
     // TODO: code here
 
     //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=
-    Task received_msg; // DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!! ESTA A FUNCIONAR A ORDEM
+    Task received_msg; // DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!!
+
+    // while (1) {
+    //     // Verificar os ES que estao livres
+    //     while (shared_memory->Num_es_ativos == 3) {
+    //         pthread_cond_wait(&shared_memory->pthread_cond, &shared_memory->pthread_sem);
+    //     }
+
+    //     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+    //         if (shared_memory->ES_ativos[i] == 0) {
+    //             // TODO:
+    //             if (pipe(shared_memory->pipes_fd[i]) == -1) {
+    //                 perror("Erro ao abrir o pipe");
+    //             }
+    //             retirar(MQ,&received_msg);//TODO: verificar se ainda tem tempo para executar a mesma!!!
+    //             if (write(shared_memory->pipes_fd[i][0], &received_msg, sizeof(Task)) == -1) {
+    //                 perror("Erro ao ler do pipe");
+    //             }
+    //             break;
+    //         }
+    //     }
+    // }
+
     // QUESTION: este codigo ja nao vai funcionar pq trocarmos a mq pela maneta certo?
     // ANSWER: Aqui vamos ter que usar semafros e variaveis para quando um server estiver livre, este enviar uma tarefa para fazer por unamed pip,
-    //ANTES de enviar verifica se ainda tem tempo para executar a tarefa, se nao tiver elimina-a da fila e escreve na log, caso tenha envia.
-    
+    // ANTES de enviar verifica se ainda tem tempo para executar a tarefa, se nao tiver elimina-a da fila e escreve na log, caso tenha envia.
+
     // while (1) {
     //     /* TO COMPLETE: Receive messages with the higher priority available */
     //     msgrcv(MQid, &received_msg, sizeof(priority_msg),-10000 , 0);
@@ -290,30 +325,67 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
 }
 
 // Funcao encarregue de executar as tarefas de cada E-Server
-void Server(int i) {//TODO: recebe por um unamed pipe a tarefa a executar e se tiver em modo performace divide a tarefa pelas 2 threads,se tiver em modo 1 executa-a com 1 thread!
+void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se tiver em modo performace divide a tarefa pelas 2 threads,se tiver em modo 1 executa-a com 1 thread!
     char mensagem[200];
-    argumentos aux;
-    for (int v = 0; v < 2; v++) {
-        argumentos *aux = (argumentos *)malloc(sizeof(argumentos));
-        strcpy(aux->nome_server, shared_memory->servers[i].nome);
-        if (v == 0) {
-            aux->capacidade_vcpu = shared_memory->servers[i].mips1;
+    argumentos *aux = (argumentos *)malloc(sizeof(argumentos));
+    aux->ES_num = i;
+    while (1) {
+        /* code */
+        // TODO: ver a mq da manutencao para ver se tem mensagens!!
+        // espera
+
+        // receber a tarefa!
+
+        Task tarefa;
+        // if (read(shared_memory->pipes_fd[i][0], &tarefa, sizeof(Task)) == -1) {
+        //     perror("Erro ao ler do pipe");
+        //     continue;
+        // }
+        // FIXME:
+        aux->idTarefa = 1;
+        if (shared_memory->CPU_ativos == 1) { // TODO: mandar por parametros para a thread a task !!
+            int v;
+            memset(mensagem, 0, 200);
+            strcpy(aux->nome_server, shared_memory->servers[i].nome);
+            if (v == 0) {
+                aux->capacidade_vcpu = shared_memory->servers[i].mips1;
+            }
+            if (v == 1) {
+                aux->capacidade_vcpu = shared_memory->servers[i].mips2;
+            }
+            aux->n_vcpu = v + 1;
+            snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
+            log_msg(mensagem, 0);
+            pthread_create(&shared_memory->servers[i].vCPU[0], NULL, ES_routine, (void *)aux);
+
+            pthread_join(shared_memory->servers[i].vCPU[0], NULL);
         }
-        if (v == 1) {
-            aux->capacidade_vcpu = shared_memory->servers[i].mips2;
+
+        if (shared_memory->CPU_ativos == 2) {
+            for (int v = 0; v < 2; v++) { // mode performace
+                memset(mensagem, 0, 200);
+                strcpy(aux->nome_server, shared_memory->servers[i].nome);
+                if (v == 0) {
+                    aux->capacidade_vcpu = shared_memory->servers[i].mips1;
+                }
+                if (v == 1) {
+                    aux->capacidade_vcpu = shared_memory->servers[i].mips2;
+                }
+                aux->n_vcpu = v + 1;
+                snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
+                log_msg(mensagem, 0);
+                pthread_create(&shared_memory->servers[i].vCPU[v], NULL, ES_routine, (void *)aux);
+            }
+
+            for (int j = 0; j < 2; j++) {
+                pthread_join(shared_memory->servers[i].vCPU[j], NULL);
+            }
         }
-        aux->n_vcpu = v + 1;
-        snprintf(mensagem, 200, "CPU %d do Edge Server %s arrancou com capacidade de %d", aux->n_vcpu, aux->nome_server, aux->capacidade_vcpu);
-        log_msg(mensagem, 0);
-        pthread_create(&shared_memory->servers[i].vCPU[v], NULL, ES_routine, (void *)aux);
-        memset(mensagem, 0, 200);
-    }
-    for (int j = 0; j < 2; j++) {
-        pthread_join(shared_memory->servers[i].vCPU[j], NULL);
     }
 }
 
 void task_manager(base *MQ) {
+
     // Criar um processo para cada Edge Server
     char teste[100];
     memset(teste, 0, 100);
@@ -321,14 +393,13 @@ void task_manager(base *MQ) {
         if ((shared_memory->servers[i].pid = fork()) == 0) {
             snprintf(teste, 100, "Edge server %d arrancou", i + 1);
             log_msg(teste, 0);
-            // DEBUG:
-            Server(i);
+            server(i);
             exit(0);
         }
     }
 
     // Criação da thread scheduler
-    pthread_t scheduler;                                        // Aqui coloquei a MQ como argumento para funcionar
+    pthread_t scheduler;
     pthread_create(&scheduler, NULL, p_scheduler, (void *)&MQ); // Criação da thread scheduler
     log_msg("Criação da thread scheduler", 0);
 
@@ -346,13 +417,18 @@ void *ES_routine(void *t) {
     argumentos aux = *(argumentos *)t;
     // printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.capacidade_vcpu);
 
+    // TODO: code here
+    char mensagem[BUFSIZE];
+    snprintf(mensagem, BUFSIZE, "SERVER_%d: Task %d completada", aux.ES_num, aux.idTarefa);
+    log_msg(mensagem, 0);
+    shared_memory->servers[aux.ES_num].tarefas_executadas++;
     pthread_exit(NULL);
 }
 
 // Funcao que trata do CTRL-Z (imprime as estatisticas)
 void SIGTSTP_HANDLER(int signum) {
 
-    printf("------Estatisticas------\n");
+    printf("\n------Estatisticas------\n");
 
     // Total de tarefas executadas
     int count = 0;
@@ -361,8 +437,8 @@ void SIGTSTP_HANDLER(int signum) {
     }
     printf("Total de tarefas executadas: %d\n", count);
 
-    // Tempo medio de cada tarefa
-    // TODO:
+    // TODO:Tempo medio de cada tarefa
+    printf("Tempo medio de cada Tarefa: 0s\n");
 
     // Numero de tarefas executadas por cada E Server
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
@@ -375,15 +451,17 @@ void SIGTSTP_HANDLER(int signum) {
     }
 
     // Num de tarefas nao executadas
-    printf("Numero de tarefas nao executadas: %d", shared_memory->tarefas_descartadas);
+    printf("Numero de tarefas nao executadas: %d\n", shared_memory->tarefas_descartadas);
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
-void SIGINT_HANDLER(int signum) { 
-//TODO: tem que esperar pelas tarefas que estas a ser executas pelos edge servers acabares!!
+void SIGINT_HANDLER(int signum) {
+    printf("\n");
+    log_msg("Sinal SIGINT recebido", 0);
+    // DEBUG: nao pode ser desta maneira, uma ideia é ter um array na shared memory em que 0 esta a funcionar e 1 esta ligado e verificar se estao a 0 e nao deixar comecar mais tarefas!!
+    //  // Esperar que as threads dos Edge Servers terminem
 
-    //DEBUG: nao pode ser desta maneira, uma ideia é ter um array na shared memory em que 0 esta a funcionar e 1 esta ligado e verificar se estao a 0 e nao deixar comecar mais tarefas!!
-    // // Esperar que as threads dos Edge Servers terminem
+    log_msg("Esperando as ultimas tarefas terminarem", 0); // TODO:
     // for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
     //     pthread_join(shared_memory->servers[i].vCPU[0], NULL);
     //     pthread_join(shared_memory->servers[i].vCPU[1], NULL);
@@ -392,6 +470,7 @@ void SIGINT_HANDLER(int signum) {
     // TODO: terminar a MQ
     msgctl(MQid, IPC_RMID, 0);
 
+    // FIXME: sempre que ha um kill() o programa acaba imediatamente
     /* Guarantees that every process receives a SIGTERM , to kill them */
     kill(0, SIGTERM);
 
@@ -408,6 +487,16 @@ void SIGINT_HANDLER(int signum) {
     kill(shared_memory->maintenance_pid, SIGKILL);
     kill(shared_memory->monitor_pid, SIGKILL);
     kill(shared_memory->TM_pid, SIGKILL);
+
+    // Close pipes
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+        close(shared_memory->pipes_fd[i][0]);
+        close(shared_memory->pipes_fd[i][1]);
+    }
+
+    // Remove shared_memory
+    shmdt(shared_memory);
+    shmctl(shmid, IPC_RMID, NULL);
 
     log_msg("O programa terminou\n", 0);
     exit(0);
