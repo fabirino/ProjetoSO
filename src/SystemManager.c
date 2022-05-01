@@ -60,10 +60,6 @@ int main(int argc, char *argv[]) {
 
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
-    // Catch Signals
-    signal(SIGTSTP, SIGTSTP_HANDLER);
-    signal(SIGINT, SIGINT_HANDLER);
-
     //  Create Message QUEUE
     if ((MQid = msgget(IPC_PRIVATE, IPC_CREAT | 0700)) == -1) {
         erro("Erro ao criar a Message Queue");
@@ -83,7 +79,6 @@ int main(int argc, char *argv[]) {
 
         exit(0);
     }
-
     // Task Manager ========================================================================
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
@@ -93,7 +88,7 @@ int main(int argc, char *argv[]) {
         MQ->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
 
         // inicicalizar unnamed pipes
-        //FIXME: BUGADO!!!
+        // FIXME: BUGADO!!!
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             if (pipe(shared_memory->servers[i].fd) != 0) {
                 erro("Erro ao criar os unnamed pipes!");
@@ -110,9 +105,9 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    // Ignorar os sinais nos seguintes processos para nao haver prints duplicados
-    signal(SIGTSTP, SIG_IGN);
-    signal(SIGINT, SIG_IGN);
+    // // Ignorar os sinais nos seguintes processos para nao haver prints duplicados
+    // signal(SIGTSTP, SIG_IGN);
+    // signal(SIGINT, SIG_IGN);
 
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {
@@ -152,6 +147,10 @@ int main(int argc, char *argv[]) {
 
         exit(0);
     }
+
+    // Catch Signals
+    signal(SIGTSTP, SIGTSTP_HANDLER);
+    signal(SIGINT, SIGINT_HANDLER);
 
     while (wait(NULL) > 0)
         ;

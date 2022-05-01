@@ -263,22 +263,26 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
             token = strtok(NULL, ";");
         }
         if (kappa != 0) {
+            // DEBUG:
             printf("[SERVER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
                    r, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
-
-            // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
-            // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
-            if (colocar(MQ, tarefa, tarefa.max_tempo) == false) {
+            // TODO: atritubuir prioridades
+            
+            // QUESTION: sera preciso fazer mais calculos aqui?
+            if (tarefa.max_tempo > shared_memory->MAX_WAIT) { // TODO: verificar se a condicao consegue ser executada no MAX_WAIT
                 log_msg("[SCHEDULER]: A fila esta cheia pelo que nao pode receber mais mensagens", 0);
+            } else {
+                // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
+                // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
+                if (colocar(MQ, tarefa, tarefa.max_tempo) == false) {
+                    char temp[BUFSIZE];
+                    snprintf(temp, BUFSIZE, "SCHEDULER: Prazo maximo de execucao da tarefa %d atingido", tarefa.idTarefa);
+                    log_msg(temp, 0);
+                    shared_memory->tarefas_descartadas++;
+                } else{
+                    MQ->n_tarefas++;
+                } 
             }
-            MQ->n_tarefas++;
-        }
-
-        if (0) { // TODO: verificar se a condicao consegue ser executada no MAX_WAIT
-            char temp[BUFSIZE];
-            snprintf(temp, BUFSIZE, "SCHEDULER: Prazo maximo de execucao da tarefa %d atingido", tarefa.idTarefa);
-            log_msg(temp, 0);
-            shared_memory->tarefas_descartadas++;
         }
     }
     pthread_exit(NULL);
@@ -317,14 +321,6 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
     // ANSWER: Aqui vamos ter que usar semafros e variaveis para quando um server estiver livre, este enviar uma tarefa para fazer por unamed pip,
     // ANTES de enviar verifica se ainda tem tempo para executar a tarefa, se nao tiver elimina-a da fila e escreve na log, caso tenha envia.
 
-    // while (1) {
-    //     /* TO COMPLETE: Receive messages with the higher priority available */
-    //     msgrcv(MQid, &received_msg, sizeof(priority_msg),-10000 , 0);
-    //     /* TO COMPLETE: end */
-
-    //     printf("[high_priority_first] Received message [%d]!\n", received_msg.msg_number);
-    //     sleep(5);
-    // }
     //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=
 
     pthread_exit(NULL);
@@ -351,10 +347,16 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
     while (1) {
         /* code */
         // TODO: ver a mq da manutencao para ver se tem mensagens!!
+        memset(mensagem, 0, 200);
+        msgrcv(MQid, &mensagem, sizeof(mensagem),1 , IPC_NOWAIT);
+        if(strlen(mensagem) != 0){
+            //TODO: codido da manutencao
+            
+            //sleep(tempoqualquer);
+            continue;
+        }
         // espera
-
         // receber a tarefa!
-
         Task tarefa; // FIXME: LER PIPE
         if (read(shared_memory->servers[i].fd[0], &tarefa, sizeof(Task)) == -1) {
             perror("Erro ao ler do pipe");
@@ -364,20 +366,20 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
 
         aux->idTarefa = tarefa.idTarefa;
         aux->num_instrucoes = tarefa.num_instrucoes;
-        if (shared_memory->mode_cpu == 1) {    // FIXME: Ver o modo performace que so esta implementado para o modo 1!!
+        if (shared_memory->mode_cpu == 1) { // FIXME: Ver o modo performace que so esta implementado para o modo 1!!
             memset(mensagem, 0, 200);
             strcpy(aux->nome_server, shared_memory->servers[i].nome);
             aux->mips_vcpu = shared_memory->servers[i].mips1;
 
-            //DEBUG:  Normal: o Edge Server está em modo de economizar energia pelo que tem apenas 1 dos vCPUs ativo (o que tiver menos capacidade de processamento)
+            // DEBUG:  Normal: o Edge Server está em modo de economizar energia pelo que tem apenas 1 dos vCPUs ativo (o que tiver menos capacidade de processamento)
             if (shared_memory->servers[i].mips1 <= shared_memory->servers[i].mips2) {
                 aux->n_vcpu = 1;
             } else {
                 aux->n_vcpu = 2;
             }
-            pthread_create(&shared_memory->servers[i].vCPU[aux->n_vcpu-1], NULL, ES_routine, (void *)aux);
+            pthread_create(&shared_memory->servers[i].vCPU[aux->n_vcpu - 1], NULL, ES_routine, (void *)aux);
 
-            pthread_join(shared_memory->servers[i].vCPU[aux->n_vcpu-1], NULL);
+            pthread_join(shared_memory->servers[i].vCPU[aux->n_vcpu - 1], NULL);
         }
 
         if (shared_memory->mode_cpu == 2) {
@@ -437,7 +439,7 @@ void *ES_routine(void *t) {
     // printf("CPU %d do Edge Server %s arrancou com capacidade de %d\n", aux.n_vcpu, aux.nome_server, aux.mips_vcpu);
 
     // Executar a tarefa
-    int tempo_execucao =  aux.num_instrucoes / aux.mips_vcpu;
+    int tempo_execucao = aux.num_instrucoes / aux.mips_vcpu;
     sleep(tempo_execucao);
 
     char mensagem[BUFSIZE];
