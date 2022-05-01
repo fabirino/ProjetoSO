@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        inicializar(MQ, shared_memory->QUEUE_POS);
+        inicializar(MQ);
 
         task_manager(MQ);
 

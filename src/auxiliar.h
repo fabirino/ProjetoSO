@@ -35,7 +35,7 @@ typedef struct {
     int msg_number; // TODO: usar este numero para saber quantas tarefas estao por terminar quando o programa acabar
     // dados
     int idTarefa;
-    int num_pedidos;
+    int num_instrucoes;
     int max_tempo;
 } priority_msg;
 
@@ -43,16 +43,17 @@ typedef struct {
 typedef struct {
     // dados
     int idTarefa;
-    int num_pedidos;
+    int num_instrucoes;
     int max_tempo;
 } Task;
 
 typedef struct {
-    int ES_num;
-    int idTarefa;   
-    int capacidade_vcpu;
+    int ES_num;   
+    int mips_vcpu;
+    int num_instrucoes;
     char nome_server[50];
     int n_vcpu;
+    int idTarefa;
 } argumentos;
 
 typedef struct {
@@ -64,7 +65,7 @@ typedef struct {
 
 typedef struct {
     no_fila * nos; // dados
-    int tam;
+    int n_tarefas;
     int entrada_lista;
 } base;
 
@@ -72,7 +73,7 @@ bool colocar(base *pf, Task tarefa, int prioridade);
 
 bool retirar(base *pf, Task *ptarefa);
 
-void inicializar(base *pf,int tamanho);
+void inicializar(base *pf);
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -114,7 +115,7 @@ typedef struct shared_memory {
     int *ES_ativos;
     int Num_es_ativos; //numero de edge servers ativos!!
 
-    int CPU_ativos;
+    int mode_cpu;
     int tarefas_descartadas;
 
 } SM;
