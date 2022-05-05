@@ -25,6 +25,8 @@
 
 #define BUFSIZE 1024
 #define PIPE_NAME "TASK_PIPE"
+#define READ 0
+#define WRITE 1
 
 int MQid;
 
@@ -98,6 +100,8 @@ typedef struct {
     int tarefas_executadas;
     int manutencoes;
 
+    int es_ativo;
+
     int fd[2];
 
 } Edge_Server;
@@ -106,7 +110,8 @@ typedef struct shared_memory {
     int QUEUE_POS;
     int MAX_WAIT;
     int EDGE_SERVER_NUMBER;
-    Edge_Server *servers;
+
+    int n_tarefas;
 
     pid_t TM_pid;
     pid_t monitor_pid;
@@ -117,10 +122,9 @@ typedef struct shared_memory {
     sem_t *sem_ficheiro;   // nao haverem 2 processos a escreverem no log ao mesmo tempo
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
 
-    pthread_mutex_t pthread_sem;    // semaforo para as threads
-    pthread_cond_t pthread_cond;    // variavel de condicao que muda de Normal para HP
+    pthread_mutex_t mutex_dispatcher;    // semaforo para as threads
+    pthread_cond_t cond_dispatcher;    // variavel de condicao que muda de Normal para HP
 
-    int *ES_ativos;
     int Num_es_ativos; //numero de edge servers ativos!!
 
     int mode_cpu;
@@ -129,6 +133,9 @@ typedef struct shared_memory {
 } SM;
 
 SM *shared_memory;
+
+Edge_Server *servers;
+
 int shmid;
 
 void erro(char *msg);

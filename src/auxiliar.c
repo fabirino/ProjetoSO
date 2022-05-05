@@ -78,13 +78,9 @@ void config(char *path) {
     fclose(fich);
 
     // Inicializar o array que mostra o numero de ES ativos
-    shared_memory->ES_ativos = (int *)malloc(sizeof(int) * shared_memory->EDGE_SERVER_NUMBER);
     shared_memory->mode_cpu = 1;
     shared_memory->Num_es_ativos = 0;
-    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        /* code */
-        shared_memory->ES_ativos[i] = 0;
-    }
+    shared_memory->n_tarefas = 0;
 }
 
 // funcao que cria os edge servers com base nos dados obtidos no ficheiro config
@@ -106,21 +102,21 @@ void createEdgeServers(char *path) {
             int n = 0;
             while (token != NULL) {
                 if (n == 0) {
-                    strcpy(shared_memory->servers[i].nome, token);
-                    shared_memory->servers[i].manutencoes = 0;
-                    shared_memory->servers[i].tarefas_executadas = 0;
+                    strcpy(servers[i].nome, token);
+                    servers[i].manutencoes = 0;
+                    servers[i].tarefas_executadas = 0;
                     n++;
                 }
 
                 else if (n == 1) {
                     int ret;
                     ret = (int)strtol(token, &ptr, 10);
-                    shared_memory->servers[i].mips1 = ret;
+                    servers[i].mips1 = ret;
                     n++;
                 } else if (n == 2) {
                     int ret;
                     ret = (int)strtol(token, &ptr, 10);
-                    shared_memory->servers[i].mips2 = ret;
+                    servers[i].mips2 = ret;
                     n++;
                 }
 
@@ -131,6 +127,10 @@ void createEdgeServers(char *path) {
         num++;
     }
     fclose(fich);
+    for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+        /* code */
+        servers[i].es_ativo = 0;
+    }
 }
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
@@ -227,7 +227,7 @@ void SIGTSTP_HANDLER(int signum) {
     // Total de tarefas executadas
     int count = 0;
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        count += shared_memory->servers[i].tarefas_executadas;
+        count += servers[i].tarefas_executadas;
     }
     printf("Total de tarefas executadas: %d\n", count);
 
@@ -236,12 +236,12 @@ void SIGTSTP_HANDLER(int signum) {
 
     // Numero de tarefas executadas por cada E Server
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        printf("Tarefas executadas pelo Edge Server %d: %d\n", i, shared_memory->servers[i].tarefas_executadas);
+        printf("Tarefas executadas pelo Edge Server %d: %d\n", i, servers[i].tarefas_executadas);
     }
 
     // Numero de manutencoes de cada E Sever
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        printf("Numero de manutencoes do Edge Server %d: %d\n", i, shared_memory->servers[i].manutencoes);
+        printf("Numero de manutencoes do Edge Server %d: %d\n", i, servers[i].manutencoes);
     }
 
     // Num de tarefas nao executadas
@@ -257,8 +257,8 @@ void SIGINT_HANDLER(int signum) {
 
     log_msg("Esperando as ultimas tarefas terminarem", 0); // TODO:
     // for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-    //     pthread_join(shared_memory->servers[i].vCPU[0], NULL);
-    //     pthread_join(shared_memory->servers[i].vCPU[1], NULL);
+    //     pthread_join(servers[i].vCPU[0], NULL);
+    //     pthread_join(servers[i].vCPU[1], NULL);
     // }
 
     // TODO: terminar a MQ
@@ -280,8 +280,8 @@ void SIGINT_HANDLER(int signum) {
 
     // Close pipes
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        close(shared_memory->servers[i].fd[0]);
-        close(shared_memory->servers[i].fd[1]);
+        close(servers[i].fd[READ]);
+        close(servers[i].fd[WRITE]);
     }
 
     // Remove shared_memory

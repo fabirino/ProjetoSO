@@ -37,8 +37,8 @@ int main(int argc, char *argv[]) {
     pthread_condattr_t cattr;
     pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
 
-    pthread_mutex_init(&shared_memory->pthread_sem, &mattr);
-    pthread_cond_init(&shared_memory->pthread_cond, &cattr);
+    pthread_mutex_init(&shared_memory->mutex_dispatcher, &mattr);
+    pthread_cond_init(&shared_memory->cond_dispatcher, &cattr);
 
     log_msg("O programa iniciou", 1);
 
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
     config(path);
     shared_memory->Num_es_ativos = 0;
-    shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
+    servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
     createEdgeServers(path);
 
     // cria o named pipe se ainda nao existe
@@ -82,14 +82,6 @@ int main(int argc, char *argv[]) {
     // Task Manager ========================================================================
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
-
-        // inicicalizar unnamed pipes
-        // FIXME: BUGADO!!!
-        for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-            if (pipe(shared_memory->servers[i].fd) != 0) {
-                erro("Erro ao criar os unnamed pipes!");
-            }
-        }
 
         // Catch Signals
 
@@ -128,7 +120,7 @@ int main(int argc, char *argv[]) {
 
             // criar um array so com os ES que estao ativos no momento
             for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-                if (shared_memory->ES_ativos[i] == 1) {
+                if (servers[i].es_ativo == 1) {
                     array[count++] = i;
                     existe = 1;
                 }
@@ -137,7 +129,7 @@ int main(int argc, char *argv[]) {
             if (existe) {
                 // Escolher um servidor para entrar em manutencao
                 servidor = array[rand() % count];
-                shared_memory->servers[servidor].em_manutencao = 1;
+                servers[servidor].em_manutencao = 1;
 
                 // detalhes da mensagem
                 priority_msg my_msg;
@@ -145,7 +137,7 @@ int main(int argc, char *argv[]) {
                 my_msg.temp_man = tempo;
                 msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
 
-                shared_memory->servers[servidor].manutencoes += 1;
+                servers[servidor].manutencoes += 1;
             }
 
             tempo = random() % 5 + 1;
