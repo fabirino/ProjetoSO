@@ -76,13 +76,20 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
 
-        // while(1){
-        //     // FIXME: o tempo vai ser o tempo das tarefas, alterar mais tarde
-        //     int tempo=5; // MAX_WAIT esta a 5, ou seja a condicao de baixo verifica-se sempre
-        //     if(MQ->tam >= shared_memory->QUEUE_POS && tempo >= shared_memory->MAX_WAIT){
-
-        //     }
-        // }
+        while (1) {//TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
+            if (shared_memory->mode_cpu == 1) {
+                int tempo = 5; // FIXME:
+                if (shared_memory->n_tarefas >= shared_memory->QUEUE_POS * 0.8 && tempo >= shared_memory->MAX_WAIT) {
+                    log_msg("O Sistema entrou em High Performance", 0);
+                    shared_memory->mode_cpu = 2;
+                }
+            } else if(shared_memory->mode_cpu == 2){
+                if (shared_memory->n_tarefas <= shared_memory->QUEUE_POS * 0.2){
+                    log_msg("O Sistema voltou ao modo Normal", 0);
+                }
+            }
+            sleep(1); // Fica lento sem o sleep, entao so verifica a cada 1s
+        }
 
         exit(0);
     }
@@ -127,7 +134,7 @@ int main(int argc, char *argv[]) {
 
             // criar um array so com os ES que estao ativos no momento
             for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-                if (servers[i].es_ativo == 1) {
+                if (servers[i].es_ativo != 0) {
                     array[count++] = i;
                     existe = 1;
                 }

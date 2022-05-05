@@ -101,6 +101,7 @@ typedef struct {
     int manutencoes;
 
     int es_ativo;
+    int cpu_ativo[2];
 
     int fd[2];
 

@@ -17,28 +17,50 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
     while (1) {
         // Verificar os ES que estao livres
         sem_wait(shared_memory->sem_SM);
-        while (shared_memory->Num_es_ativos == shared_memory->EDGE_SERVER_NUMBER || shared_memory->n_tarefas == 0) {
+        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (shared_memory->Num_es_ativos == (shared_memory->EDGE_SERVER_NUMBER * 2)))) {
             sem_post(shared_memory->sem_SM);
             pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
         }
         sem_wait(shared_memory->sem_servers);
-        printf("passou while, %d | %d\n",shared_memory->Num_es_ativos,servers[0].es_ativo);
+        printf("passou while, %d | %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo);
 
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-            if (servers[i].es_ativo == 0) {
-                // TODO:
-                if (retirar(&MQ, &received_msg)) {
-                    if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
-                        perror("Erro ao escrever no pipe:");
+            sem_wait(shared_memory->sem_SM);
+            if (shared_memory->mode_cpu == 1) {
+                sem_post(shared_memory->sem_SM);
+                if (servers[i].es_ativo == 0) {
+                    // TODO:
+                    if (retirar(&MQ, &received_msg)) {
+                        if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
+                            perror("Erro ao escrever no pipe:");
+                        }
+                        sem_wait(shared_memory->sem_SM);
+                        shared_memory->n_tarefas--;
+                        sem_post(shared_memory->sem_SM);
+                    } else {
+                        printf("\nMQ vazia!!\n");
                     }
-                    sem_wait(shared_memory->sem_SM);
-                    shared_memory->n_tarefas--;
-                    sem_post(shared_memory->sem_SM);
-                } else {
-                    printf("\nMQ vazia!!\n");
-                }
-                break;
-            }else continue;;
+                    break;
+                } else
+                    continue;
+            } else if (shared_memory->mode_cpu == 2) {
+                sem_post(shared_memory->sem_SM);
+                if (servers[i].es_ativo < 2) {
+                    // TODO:
+                    if (retirar(&MQ, &received_msg)) {
+                        if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
+                            perror("Erro ao escrever no pipe:");
+                        }
+                        sem_wait(shared_memory->sem_SM);
+                        shared_memory->n_tarefas--;
+                        sem_post(shared_memory->sem_SM);
+                    } else {
+                        printf("\nMQ vazia!!\n");
+                    }
+                    break;
+                } else
+                    continue;
+            }
         }
         sleep(1);
     }
@@ -87,15 +109,15 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
         if (read(servers[i].fd[READ], &tarefa, sizeof(Task)) == -1) {
             perror("Erro ao ler do pipe");
             continue;
-        }else{
+        } else {
             printf("[SERVER%d]  reveived, Task_id: %d number of requests: %d , max time: %d\n",
-                           i, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
+                   i, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
         }
-        sem_wait(shared_memory->sem_SM);
-        shared_memory->Num_es_ativos++;
-        servers[i].es_ativo = 1;
-        sem_post(shared_memory->sem_SM);
-        sem_post(shared_memory->sem_servers);
+        // sem_wait(shared_memory->sem_SM);
+        // shared_memory->Num_es_ativos++;
+        // servers[i].es_ativo++;
+        // sem_post(shared_memory->sem_SM);
+        // sem_post(shared_memory->sem_servers);
         // FIXME:
 
         aux->idTarefa = tarefa.idTarefa;
@@ -111,36 +133,52 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             } else {
                 aux->n_vcpu = 2;
             }
+            sem_wait(shared_memory->sem_SM);
+            shared_memory->Num_es_ativos++;
+            servers[i].es_ativo++;
+            servers[i].cpu_ativo[aux->n_vcpu - 1] = 1;
+            sem_post(shared_memory->sem_SM);
+            sem_post(shared_memory->sem_servers);
+
             pthread_create(&servers[i].vCPU[aux->n_vcpu - 1], NULL, ES_routine, (void *)aux);
 
             pthread_join(servers[i].vCPU[aux->n_vcpu - 1], NULL);
         }
 
-        if (shared_memory->mode_cpu == 2) {
-            for (int v = 0; v < 2; v++) { // HIGH PERFORMANCE
-                memset(mensagem, 0, 200);
-                strcpy(aux->nome_server, servers[i].nome);
-                if (v == 0) {
-                    aux->mips_vcpu = servers[i].mips1;
-                }
-                if (v == 1) {
-                    aux->mips_vcpu = servers[i].mips2;
-                }
-                aux->n_vcpu = v + 1;
-                pthread_create(&servers[i].vCPU[v], NULL, ES_routine, (void *)aux);
+        else if (shared_memory->mode_cpu == 2) {
+            memset(mensagem, 0, 200);
+            strcpy(aux->nome_server, servers[i].nome);
+            if (servers[i].cpu_ativo[0] == 0) {
+                aux->mips_vcpu = servers[i].mips1;
+                aux->n_vcpu = 1;
+
+                sem_wait(shared_memory->sem_SM);
+                shared_memory->Num_es_ativos++;
+                servers[i].es_ativo++;
+                servers[i].cpu_ativo[aux->n_vcpu - 1] = 1;
+                sem_post(shared_memory->sem_SM);
+                sem_post(shared_memory->sem_servers);
+
+                pthread_create(&servers[i].vCPU[0], NULL, ES_routine, (void *)aux);
+
+            } else if (servers[i].cpu_ativo[1] == 0) {
+                aux->mips_vcpu = servers[i].mips2;
+                aux->n_vcpu = 2;
+
+                sem_wait(shared_memory->sem_SM);
+                shared_memory->Num_es_ativos++;
+                servers[i].es_ativo++;
+                servers[i].cpu_ativo[aux->n_vcpu - 1] = 1;
+                sem_post(shared_memory->sem_SM);
+                sem_post(shared_memory->sem_servers);
+
+                pthread_create(&servers[i].vCPU[1], NULL, ES_routine, (void *)aux);
             }
 
-            for (int j = 0; j < 2; j++) {
-                pthread_join(servers[i].vCPU[j], NULL);
-            }
+            // for (int j = 0; j < 2; j++) { // QUESTION: UII como fazer o pthrea_join se estiver 1 vcpu a espera
+            //     pthread_join(servers[i].vCPU[j], NULL);
+            // }
         }
-        pthread_mutex_lock(&shared_memory->mutex_dispatcher);
-        servers[i].es_ativo = 0;
-        sem_wait(shared_memory->sem_SM);
-        shared_memory->Num_es_ativos--;
-        sem_post(shared_memory->sem_SM);
-        pthread_cond_signal(&shared_memory->cond_dispatcher);
-        pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
     }
 }
 
@@ -268,6 +306,16 @@ void *ES_routine(void *t) {
     char mensagem[BUFSIZE];
     snprintf(mensagem, BUFSIZE, "SERVER_%d: Task %d completada", aux.ES_num, aux.idTarefa);
     log_msg(mensagem, 0);
+
+    sem_wait(shared_memory->sem_SM);
     servers[aux.ES_num].tarefas_executadas++;
+    servers[aux.ES_num].es_ativo--;
+    servers[aux.ES_num].cpu_ativo[aux.n_vcpu - 1] = 0;
+    shared_memory->Num_es_ativos--;
+    sem_post(shared_memory->sem_SM);
+    pthread_mutex_lock(&shared_memory->mutex_dispatcher);
+    pthread_cond_signal(&shared_memory->cond_dispatcher);
+    pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+
     pthread_exit(NULL);
 }

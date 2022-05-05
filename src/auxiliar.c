@@ -78,7 +78,7 @@ void config(char *path) {
     fclose(fich);
 
     // Inicializar o array que mostra o numero de ES ativos
-    shared_memory->mode_cpu = 1;
+    shared_memory->mode_cpu = 2;
     shared_memory->Num_es_ativos = 0;
     shared_memory->n_tarefas = 0;
 }
@@ -130,6 +130,9 @@ void createEdgeServers(char *path) {
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         /* code */
         servers[i].es_ativo = 0;
+        for (int l = 0; l < 2; l++) {
+            servers[i].cpu_ativo[l] = 0;
+        }
     }
 }
 
