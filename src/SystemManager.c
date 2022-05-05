@@ -42,13 +42,6 @@ int main(int argc, char *argv[]) {
 
     log_msg("O programa iniciou", 1);
 
-    // cria o named pipe se ainda nao existe
-    if ((mkfifo(PIPE_NAME, O_CREAT | O_EXCL | 0600) < 0) && (errno != EEXIST)) {
-        perror("Nao se pode criar o pipe:");
-        exit(0);
-    }
-    log_msg("O TASK_PIPE iniciou", 0);
-
     // Read config file
     char path[20];
     strcpy(path, argv[1]);
@@ -58,6 +51,13 @@ int main(int argc, char *argv[]) {
     shared_memory->servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
     createEdgeServers(path);
 
+    // cria o named pipe se ainda nao existe
+    if ((mkfifo(PIPE_NAME, O_CREAT | O_EXCL | 0600) < 0) && (errno != EEXIST)) {
+        perror("Cannot create named pipe: ");
+        exit(0);
+    }
+
+    log_msg("O TASK_PIPE iniciou", 0);
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
     //  Create Message QUEUE
@@ -83,10 +83,6 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
 
-        // criar a message queue interna a la maneta !!
-        base *MQ;
-        MQ->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
-
         // inicicalizar unnamed pipes
         // FIXME: BUGADO!!!
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
@@ -95,10 +91,13 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        inicializar(MQ);
+        // Catch Signals
 
-        task_manager(MQ);
+        task_manager();
 
+        // Catch Signals
+        signal(SIGTSTP, SIGTSTP_HANDLER);
+        signal(SIGINT, SIGINT_HANDLER);
         while (wait(NULL) > 0)
             ;
 
@@ -113,44 +112,54 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->maintenance_pid = fork()) == 0) {
         log_msg("O processo Maintenance Manager comecou", 0);
 
-        // while(1){//BUG: QUANDO COLOCA-SE ESTE WHILE FICA TODO LAGADO A VM!!!!!!! RESORVER NS COMO
-        //     // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
-        //     // como e que o edge server responde ao MM??????????
+        while (1) { // BUG: QUANDO COLOCA-SE ESTE WHILE FICA TODO LAGADO A VM!!!!!!! RESORVER NS COMO
+            // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
+            // como e que o edge server responde ao MM??????????
 
-        //     time_t t;
-        //     srand((unsigned)time(&t));
+            time_t t;
+            srand((unsigned)time(&t));
 
-        //     int tempo = random() % 5 + 1;
+            int tempo = rand() % 5 + 1;
 
-        //     int servidor = random() % shared_memory->EDGE_SERVER_NUMBER;
+            int servidor;
 
-        //     int existe = 0;
+            int count, existe = 0;
+            int array[shared_memory->EDGE_SERVER_NUMBER];
 
-        //      for (int i = 0; i<shared_memory->EDGE_SERVER_NUMBER; i++){
-        //         if (shared_memory->servers[i].em_manutencao){
-        //             existe = 1;
-        //         }
-        //     }
-        //     if(!existe){
-        //         shared_memory->servers[servidor].em_manutencao = 1;
-        //         char temp[BUFSIZE];
-        //         snprintf(temp, BUFSIZE, "O Edge Server %d entrou em manutencao", servidor + 1);
-        //         //sleep(tempo);
+            // criar um array so com os ES que estao ativos no momento
+            for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+                if (shared_memory->ES_ativos[i] == 1) {
+                    array[count++] = i;
+                    existe = 1;
+                }
+            }
+            // se existir ES ativos, escolhe um para entrar em manutencao
+            if (existe) {
+                // Escolher um servidor para entrar em manutencao
+                servidor = array[rand() % count];
+                shared_memory->servers[servidor].em_manutencao = 1;
 
-        //         shared_memory->servers[servidor].manutencoes +=1;
+                // detalhes da mensagem
+                priority_msg my_msg;
+                my_msg.priority = servidor;
+                my_msg.temp_man = tempo;
+                msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
 
-        //         tempo = random() % 5 + 1;
-        //         //sleep(tempo);
-        //     }
+                shared_memory->servers[servidor].manutencoes += 1;
+            }
 
-        // }
+            tempo = random() % 5 + 1;
+
+
+            sleep(tempo);
+        }
 
         exit(0);
     }
 
     // Catch Signals
-    signal(SIGTSTP, SIGTSTP_HANDLER);
-    signal(SIGINT, SIGINT_HANDLER);
+    // signal(SIGTSTP, SIGTSTP_HANDLER);
+    // signal(SIGINT, SIGINT_HANDLER);
 
     while (wait(NULL) > 0)
         ;

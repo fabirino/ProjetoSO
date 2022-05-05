@@ -5,7 +5,7 @@ FLAGS	= -Wall -g -pthread
 CC	    = gcc
 
 PROG1   = offload_simulator
-OBJS1   = SystemManager.o auxiliar.o
+OBJS1   = SystemManager.o TaskManager.o auxiliar.o
 
 PROG2	= mobile_node
 OBJS2	= MobileNode.o auxiliar.o
@@ -32,7 +32,9 @@ SystemManager.o: SystemManager.c
 
 auxiliar.o:	auxiliar.h auxiliar.c
 
-offload_simulator: SystemManager.o auxiliar.o 
+TaskManager.o: TaskManager.c
+
+offload_simulator: SystemManager.o TaskManager.o auxiliar.o 
 
 #Mobile Node
 

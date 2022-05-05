@@ -28,15 +28,22 @@
 
 int MQid;
 
-typedef struct {
-    /* Message type */
+// typedef struct {
+//     /* Message type */
+//     long priority;
+//     /* Payload */
+//     int msg_number; // TODO: usar este numero para saber quantas tarefas estao por terminar quando o programa acabar
+//     // dados
+//     int idTarefa;
+//     int num_instrucoes;
+//     int max_tempo;
+// } priority_msg;
+
+typedef struct{
+    /*Message Type*/
     long priority;
-    /* Payload */
-    int msg_number; // TODO: usar este numero para saber quantas tarefas estao por terminar quando o programa acabar
-    // dados
-    int idTarefa;
-    int num_instrucoes;
-    int max_tempo;
+    /*Payload*/
+    int temp_man;
 } priority_msg;
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
@@ -68,6 +75,7 @@ typedef struct {
     int n_tarefas;
     int entrada_lista;
 } base;
+
 
 bool colocar(base *pf, Task tarefa, int prioridade);
 
@@ -137,7 +145,7 @@ void SIGTSTP_HANDLER(int signum);
 
 void SIGINT_HANDLER(int signum);
 
-void task_manager(base *MQ);
+void task_manager();
 
 void server(int i);
 
