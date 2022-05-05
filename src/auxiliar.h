@@ -121,6 +121,7 @@ typedef struct shared_memory {
     sem_t *sem_tarefas;    // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
     sem_t *sem_ficheiro;   // nao haverem 2 processos a escreverem no log ao mesmo tempo
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
+    sem_t *sem_servers;   //semafro para esperar para que 
 
     pthread_mutex_t mutex_dispatcher;    // semaforo para as threads
     pthread_cond_t cond_dispatcher;    // variavel de condicao que muda de Normal para HP
@@ -137,6 +138,7 @@ SM *shared_memory;
 Edge_Server *servers;
 
 int shmid;
+int shmserversid;
 
 void erro(char *msg);
 

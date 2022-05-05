@@ -209,6 +209,7 @@ bool retirar(base *pf, Task *ptarefa) {
 
     pf->nos[i].ocupado = false;
     *ptarefa = pf->nos[i].tarefa;
+    pf->n_tarefas--;
 
     return true;
 }
@@ -268,11 +269,13 @@ void SIGINT_HANDLER(int signum) {
     sem_close(shared_memory->sem_manutencao);
     sem_close(shared_memory->sem_tarefas);
     sem_close(shared_memory->sem_ficheiro);
+    sem_close(shared_memory->sem_SM);
+    sem_close(shared_memory->sem_servers);
     sem_unlink("SEM_MANUTENCAO");
     sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
-    sem_close(shared_memory->sem_SM);
     sem_unlink("SEM_SM");
+    sem_unlink("SEM_SERVERS");
 
     kill(shared_memory->maintenance_pid, SIGKILL);
     kill(shared_memory->monitor_pid, SIGKILL);

@@ -16,9 +16,14 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
 
     while (1) {
         // Verificar os ES que estao livres
-        // while (shared_memory->Num_es_ativos == shared_memory->EDGE_SERVER_NUMBER || shared_memory->n_tarefas == 0) {
-        //     pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
-        // }
+        sem_wait(shared_memory->sem_SM);
+        while (shared_memory->Num_es_ativos == shared_memory->EDGE_SERVER_NUMBER || shared_memory->n_tarefas == 0) {
+            sem_post(shared_memory->sem_SM);
+            pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
+        }
+        sem_wait(shared_memory->sem_servers);
+        printf("passou while, %d | %d\n",shared_memory->Num_es_ativos,servers[0].es_ativo);
+
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             if (servers[i].es_ativo == 0) {
                 // TODO:
@@ -26,11 +31,14 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                     if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
                         perror("Erro ao escrever no pipe:");
                     }
+                    sem_wait(shared_memory->sem_SM);
+                    shared_memory->n_tarefas--;
+                    sem_post(shared_memory->sem_SM);
                 } else {
                     printf("\nMQ vazia!!\n");
                 }
                 break;
-            }
+            }else continue;;
         }
         sleep(1);
     }
@@ -83,6 +91,11 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             printf("[SERVER%d]  reveived, Task_id: %d number of requests: %d , max time: %d\n",
                            i, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
         }
+        sem_wait(shared_memory->sem_SM);
+        shared_memory->Num_es_ativos++;
+        servers[i].es_ativo = 1;
+        sem_post(shared_memory->sem_SM);
+        sem_post(shared_memory->sem_servers);
         // FIXME:
 
         aux->idTarefa = tarefa.idTarefa;
@@ -121,11 +134,13 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
                 pthread_join(servers[i].vCPU[j], NULL);
             }
         }
-        // pthread_mutex_lock(&shared_memory->mutex_dispatcher);
+        pthread_mutex_lock(&shared_memory->mutex_dispatcher);
         servers[i].es_ativo = 0;
+        sem_wait(shared_memory->sem_SM);
         shared_memory->Num_es_ativos--;
-        // pthread_cond_signal(&shared_memory->cond_dispatcher);
-        // pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+        sem_post(shared_memory->sem_SM);
+        pthread_cond_signal(&shared_memory->cond_dispatcher);
+        pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
     }
 }
 
@@ -179,11 +194,13 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                         log_msg(temp, 0);
                         shared_memory->tarefas_descartadas++;
                     } else {
-                        // pthread_mutex_lock(&shared_memory->mutex_dispatcher);
+                        pthread_mutex_lock(&shared_memory->mutex_dispatcher);
                         MQ.n_tarefas++;
+                        sem_wait(shared_memory->sem_SM);
                         shared_memory->n_tarefas++;
-                        // pthread_cond_signal(&shared_memory->cond_dispatcher);
-                        // pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+                        sem_post(shared_memory->sem_SM);
+                        pthread_cond_signal(&shared_memory->cond_dispatcher);
+                        pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
                         char temp[BUFSIZE];
                         snprintf(temp, BUFSIZE, "SCHEDULER: Tarefa inserida na fila nº %d", MQ.n_tarefas);
                         log_msg(temp, 0);
@@ -196,7 +213,6 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
 
         close(fd);
     }
-    printf("bye bye");
     pthread_exit(NULL);
 }
 

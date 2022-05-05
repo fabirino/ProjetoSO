@@ -16,7 +16,6 @@ int main(int argc, char *argv[]) {
 
     // Create shared memory
     shmid = shmget(IPC_PRIVATE, sizeof(SM), IPC_CREAT | 0766);
-
     // Attach shared memory
     shared_memory = (SM *)shmat(shmid, NULL, 0);
 
@@ -25,16 +24,20 @@ int main(int argc, char *argv[]) {
     sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
     sem_unlink("SEM_SM");
+    sem_unlink("SEM_SERVERS");
     shared_memory->sem_manutencao = sem_open("SEM_MANUTENCAO", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_tarefas = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_ficheiro = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
+    shared_memory->sem_servers = sem_open("SEM_SERVERS", O_CREAT | O_EXCL, 0700, 1);
     // Semaforo para ler e escrever da Shared Memory
     shared_memory->sem_SM = sem_open("SEM_SM", O_CREAT | O_EXCL, 0700, 1);
 
     // Variavel de condicao e semaforo TODO: testando da para alterar a variavel de condicao noutro processo
     pthread_mutexattr_t mattr;
-    pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
     pthread_condattr_t cattr;
+    pthread_mutexattr_init(&mattr);
+    pthread_condattr_init(&cattr);
+    pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
     pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
 
     pthread_mutex_init(&shared_memory->mutex_dispatcher, &mattr);
@@ -48,7 +51,11 @@ int main(int argc, char *argv[]) {
 
     config(path);
     shared_memory->Num_es_ativos = 0;
-    servers = (Edge_Server *)malloc(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER);
+
+    shmserversid = shmget(IPC_PRIVATE, sizeof(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER), IPC_CREAT | 0766);
+
+    // Attach shared memory
+    servers = (Edge_Server *)shmat(shmserversid, NULL, 0);
     createEdgeServers(path);
 
     // cria o named pipe se ainda nao existe
