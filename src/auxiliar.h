@@ -41,7 +41,7 @@ int MQid;
 //     int max_tempo;
 // } priority_msg;
 
-typedef struct{
+typedef struct {
     /*Message Type*/
     long priority;
     /*Payload*/
@@ -57,7 +57,7 @@ typedef struct {
 } Task;
 
 typedef struct {
-    int ES_num;   
+    int ES_num;
     int mips_vcpu;
     int num_instrucoes;
     char nome_server[50];
@@ -73,11 +73,10 @@ typedef struct {
 } no_fila;
 
 typedef struct {
-    no_fila * nos; // dados
+    no_fila *nos; // dados
     int n_tarefas;
     int entrada_lista;
 } base;
-
 
 bool colocar(base *pf, Task tarefa, int prioridade);
 
@@ -122,12 +121,15 @@ typedef struct shared_memory {
     sem_t *sem_tarefas;    // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
     sem_t *sem_ficheiro;   // nao haverem 2 processos a escreverem no log ao mesmo tempo
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
-    sem_t *sem_servers;   //semafro para esperar para que 
+    sem_t *sem_servers;    // semafro para esperar para que
 
-    pthread_mutex_t mutex_dispatcher;    // semaforo para as threads
-    pthread_cond_t cond_dispatcher;    // variavel de condicao que muda de Normal para HP
+    pthread_mutex_t mutex_dispatcher; // semaforo para as threads
+    pthread_cond_t cond_dispatcher;   // variavel de condicao que muda de Normal para HP
+    pthread_mutex_t mutex_manutencao; 
+    pthread_cond_t cond_manutencao;   
 
-    int Num_es_ativos; //numero de edge servers ativos!!
+
+    int Num_es_ativos; // numero de edge servers ativos!!
 
     int mode_cpu;
     int tarefas_descartadas;
@@ -137,6 +139,9 @@ typedef struct shared_memory {
 SM *shared_memory;
 
 Edge_Server *servers;
+
+pthread_mutexattr_t mattr;
+pthread_condattr_t cattr;
 
 int shmid;
 int shmserversid;

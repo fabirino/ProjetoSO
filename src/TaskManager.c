@@ -22,16 +22,18 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
         }
         sem_wait(shared_memory->sem_servers);
-        printf("passou while, %d | %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo);
 
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             sem_wait(shared_memory->sem_SM);
+            printf("passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
             if (shared_memory->mode_cpu == 1) {
                 sem_post(shared_memory->sem_SM);
                 if (servers[i].es_ativo == 0) {
                     // TODO:
                     if (retirar(&MQ, &received_msg)) {
+                        printf("retirou");
                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
+                            printf(" |->enviou!!\n");
                             perror("Erro ao escrever no pipe:");
                         }
                         sem_wait(shared_memory->sem_SM);
@@ -96,15 +98,66 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
         /* code */
         // TODO: ver a mq da manutencao para ver se tem mensagens!!
         memset(mensagem, 0, 200);
-        msgrcv(MQid, &mensagem, sizeof(mensagem), 1, IPC_NOWAIT);
-        if (strlen(mensagem) != 0) {
-            // TODO: codido da manutencao
+        priority_msg MQ_msg;
+        if (msgrcv(MQid, &MQ_msg, sizeof(priority_msg), i, IPC_NOWAIT) != -1) { // o erro nao e daqui!!
+            // printf("ENTREI EM MANUTENCAO, ESPERANDO SERVER ACABAR TAREFA! %d \n", i);
+            while (servers[i].es_ativo > 0) {
+                printf("SERVER%d espera while pthread_cond\n", i);
+                pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
+            }
+            printf("SERVER%d passou while pthread_cond\n\n");
+            if (shared_memory->mode_cpu == 1) {
+                sem_wait(shared_memory->sem_SM);
+                shared_memory->Num_es_ativos++;
+                servers[i].es_ativo++;
+                sem_post(shared_memory->sem_SM);
+                sem_post(shared_memory->sem_servers);
+            } else {
+                sem_wait(shared_memory->sem_SM);
+                shared_memory->Num_es_ativos++;
+                shared_memory->Num_es_ativos++;
+                servers[i].es_ativo = 2;
+                servers[i].cpu_ativo[0] = 1;
+                servers[i].cpu_ativo[1] = 1;
+                sem_post(shared_memory->sem_SM);
+                sem_post(shared_memory->sem_servers);
+            }
+            memset(mensagem, 0, 200);
+            snprintf(mensagem, 200, "O SERVER_%d vai entrar em manutencao", i);
+            log_msg(mensagem, 0);
+            servers[i].em_manutencao = 1;
 
-            // sleep(tempoqualquer);
-            continue;
+            sleep(MQ_msg.temp_man);
+
+            msgrcv(MQid, &MQ_msg, sizeof(priority_msg), i, 0);
+            memset(mensagem, 0, 200);
+            snprintf(mensagem, 200, "O SERVER_%d terminou a manutencao", i);
+            log_msg(mensagem, 0);
+            if (shared_memory->mode_cpu == 1) {
+                sem_wait(shared_memory->sem_SM);
+                servers[i].es_ativo = 0;
+                shared_memory->Num_es_ativos--;
+                sem_post(shared_memory->sem_SM);
+                pthread_mutex_lock(&shared_memory->mutex_dispatcher);
+                pthread_cond_signal(&shared_memory->cond_dispatcher);
+                pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+            } else {
+                sem_wait(shared_memory->sem_SM);
+                servers[i].es_ativo = 0;
+                servers[i].cpu_ativo[0] = 0;
+                servers[i].cpu_ativo[1] = 0;
+                shared_memory->Num_es_ativos--;
+                shared_memory->Num_es_ativos--;
+                sem_post(shared_memory->sem_SM);
+                pthread_mutex_lock(&shared_memory->mutex_dispatcher);
+                pthread_cond_signal(&shared_memory->cond_dispatcher);
+                pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+            }
+            servers[i].em_manutencao = 0;
         }
         // espera
         // receber a tarefa!
+
         Task tarefa; // FIXME: LER PIPE
         if (read(servers[i].fd[READ], &tarefa, sizeof(Task)) == -1) {
             perror("Erro ao ler do pipe");
@@ -113,6 +166,8 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             printf("[SERVER%d]  reveived, Task_id: %d number of requests: %d , max time: %d\n",
                    i, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
         }
+        // close(servers[i].fd[READ]);
+        // close(servers[i].fd[WRITE]);
         // sem_wait(shared_memory->sem_SM);
         // shared_memory->Num_es_ativos++;
         // servers[i].es_ativo++;
@@ -142,7 +197,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
 
             pthread_create(&servers[i].vCPU[aux->n_vcpu - 1], NULL, ES_routine, (void *)aux);
 
-            pthread_join(servers[i].vCPU[aux->n_vcpu - 1], NULL);
+            // pthread_join(servers[i].vCPU[aux->n_vcpu - 1], NULL);
         }
 
         else if (shared_memory->mode_cpu == 2) {
@@ -174,11 +229,11 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
 
                 pthread_create(&servers[i].vCPU[1], NULL, ES_routine, (void *)aux);
             }
-
-            // for (int j = 0; j < 2; j++) { // QUESTION: UII como fazer o pthrea_join se estiver 1 vcpu a espera
-            //     pthread_join(servers[i].vCPU[j], NULL);
-            // }
         }
+        // ABRIR NOVAMENTE PIPES!!
+        //  if (pipe(servers[i].fd) != 0) {
+        //      erro("Erro ao criar os unnamed pipes!");
+        //  }
     }
 }
 
@@ -222,7 +277,7 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                     tarefa.num_instrucoes = atoi(token);
                 else {
                     tarefa.max_tempo = atoi(token);
-                    printf("[SERVER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
+                    printf("[scheduler] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d\n",
                            r, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
                     // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
                     // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
@@ -313,9 +368,14 @@ void *ES_routine(void *t) {
     servers[aux.ES_num].cpu_ativo[aux.n_vcpu - 1] = 0;
     shared_memory->Num_es_ativos--;
     sem_post(shared_memory->sem_SM);
+
     pthread_mutex_lock(&shared_memory->mutex_dispatcher);
-    pthread_cond_signal(&shared_memory->cond_dispatcher);
+    pthread_cond_broadcast(&shared_memory->cond_dispatcher);
     pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+
+    // pthread_mutex_lock(&shared_memory->mutex_manutencao);
+    // pthread_cond_signal(&shared_memory->cond_manutencao);
+    // pthread_mutex_unlock(&shared_memory->mutex_manutencao);
 
     pthread_exit(NULL);
 }

@@ -33,8 +33,6 @@ int main(int argc, char *argv[]) {
     shared_memory->sem_SM = sem_open("SEM_SM", O_CREAT | O_EXCL, 0700, 1);
 
     // Variavel de condicao e semaforo TODO: testando da para alterar a variavel de condicao noutro processo
-    pthread_mutexattr_t mattr;
-    pthread_condattr_t cattr;
     pthread_mutexattr_init(&mattr);
     pthread_condattr_init(&cattr);
     pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
@@ -42,6 +40,8 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_init(&shared_memory->mutex_dispatcher, &mattr);
     pthread_cond_init(&shared_memory->cond_dispatcher, &cattr);
+    pthread_mutex_init(&shared_memory->mutex_manutencao, &mattr);
+    pthread_cond_init(&shared_memory->cond_manutencao, &cattr);
 
     log_msg("O programa iniciou", 1);
 
@@ -76,20 +76,21 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
 
-        while (1) {//TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
-            if (shared_memory->mode_cpu == 1) {
-                int tempo = 5; // FIXME:
-                if (shared_memory->n_tarefas >= shared_memory->QUEUE_POS * 0.8 && tempo >= shared_memory->MAX_WAIT) {
-                    log_msg("O Sistema entrou em High Performance", 0);
-                    shared_memory->mode_cpu = 2;
-                }
-            } else if(shared_memory->mode_cpu == 2){
-                if (shared_memory->n_tarefas <= shared_memory->QUEUE_POS * 0.2){
-                    log_msg("O Sistema voltou ao modo Normal", 0);
-                }
-            }
-            sleep(1); // Fica lento sem o sleep, entao so verifica a cada 1s
-        }
+        // while (1) { // TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
+        //     if (shared_memory->mode_cpu == 1) {
+        //         int tempo = 5; // FIXME:
+        //         if (shared_memory->n_tarefas >= shared_memory->QUEUE_POS * 0.8 && tempo >= shared_memory->MAX_WAIT) {
+        //             log_msg("O Sistema entrou em High Performance", 0);
+        //             shared_memory->mode_cpu = 2;
+        //         }
+        //     } else if (shared_memory->mode_cpu == 2) {
+        //         if (shared_memory->n_tarefas <= shared_memory->QUEUE_POS * 0.2) {
+        //             log_msg("O Sistema voltou ao modo Normal", 0);
+        //             shared_memory->mode_cpu = 1;
+        //         }
+        //     }
+        //     sleep(1); // Fica lento sem o sleep, entao so verifica a cada 1s
+        // }
 
         exit(0);
     }
@@ -117,6 +118,7 @@ int main(int argc, char *argv[]) {
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {
         log_msg("O processo Maintenance Manager comecou", 0);
+        sleep(5);
 
         while (1) { // BUG: QUANDO COLOCA-SE ESTE WHILE FICA TODO LAGADO A VM!!!!!!! RESORVER NS COMO
             // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
@@ -127,20 +129,23 @@ int main(int argc, char *argv[]) {
 
             int tempo = rand() % 5 + 1;
 
+            sleep(tempo);
+
             int servidor;
 
-            int count, existe = 0;
+            int count = 0;
+            int existe = 0;
             int array[shared_memory->EDGE_SERVER_NUMBER];
 
-            // criar um array so com os ES que estao ativos no momento
+            // criar um array so com os ES que nao estao em manutencao no momento
             for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-                if (servers[i].es_ativo != 0) {
+                if (servers[i].em_manutencao == 0) {
                     array[count++] = i;
                     existe = 1;
                 }
             }
             // se existir ES ativos, escolhe um para entrar em manutencao
-            if (existe) {
+            if (existe && count <= shared_memory->EDGE_SERVER_NUMBER && count > 1) {
                 // Escolher um servidor para entrar em manutencao
                 servidor = array[rand() % count];
                 servers[servidor].em_manutencao = 1;
@@ -150,14 +155,16 @@ int main(int argc, char *argv[]) {
                 my_msg.priority = servidor;
                 my_msg.temp_man = tempo;
                 msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
+                printf("manutencao server n_[%d]\n", servidor);
+
+                // tempo = rand() % 5 + 1;
+
+                // sleep(tempo);
+
+                msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
 
                 servers[servidor].manutencoes += 1;
             }
-
-            tempo = random() % 5 + 1;
-
-
-            sleep(tempo);
         }
 
         exit(0);
