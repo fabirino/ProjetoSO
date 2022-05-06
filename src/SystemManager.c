@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
             // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
             // como e que o edge server responde ao MM??????????
 
-            time_t t;
+            time_t t;//FIXME: so gera os 2 primeiros, ver depois esta parte!!
             srand((unsigned)time(&t));
 
             int tempo = rand() % 5 + 1;
@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
 
                 // sleep(tempo);
 
-                msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
+                //msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
 
                 servers[servidor].manutencoes += 1;
             }
