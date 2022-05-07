@@ -18,16 +18,26 @@ void reoorganizar(base *pf, time_t tempo) { // Insertion Sort (Geeks for Geeks)
     // Acho que nao precisamos de reorganizar pq nos inserimos na lista logo por ordem
 
     // int i, key, j;
-    // for (i = 1; i < pf->n_tarefas; i++) {
-    //     key = pf->nos[i].prioridade;
-    //     j = i - 1;
+    for (int i = 0; i < shared_memory->QUEUE_POS; i++) {
+        if (pf->nos->ocupado == true) {
+            time_t t = tempo - pf->nos[i].tarefa.tempo_chegada;
+            pf->nos[i].tarefa.max_tempo -= t;
+            if (pf->nos[i].tarefa.max_tempo <= 0) {
+                char mensagem[200];
+                snprintf(mensagem, 200, "[SCHEDULER]: Tempo insuficiente para executar a tarefa %d", pf->nos[i].tarefa.idTarefa);
+                pf->nos[i].ocupado = false;
+                pf->n_tarefas--;
+                shared_memory->n_tarefas--;
 
-    //     while (j >= 0 && pf->nos[j].prioridade > key) {
-    //         pf->nos[j + 1] = pf->nos[j];
-    //         j = j - 1;
-    //     }
-    //     pf->nos[j + 1].prioridade = key;
-    // }
+                log_msg(mensagem, 0);
+            } else {
+                if (pf->nos[i].tarefa.max_tempo < 1)
+                    pf->nos[i].prioridade = 1;
+                else
+                    pf->nos[i].prioridade = (int)pf->nos[i].tarefa.max_tempo;
+            }
+        }
+    }
 
     // // DEBUG: esta mal por causa da mens_seguinte muito provavelmente
     // printf("\n\n mostrar array ordenado: ");
@@ -102,11 +112,11 @@ bool retirar(base *pf, Task *ptarefa) {
     if (j != -1)
         // havia mais do que uma mensagem na lista
         pf->nos[j].mens_seguinte = -1;
-
+    sem_wait(shared_memory->sem_fila);
     pf->nos[i].ocupado = false;
     *ptarefa = pf->nos[i].tarefa;
     pf->n_tarefas--;
-
+    sem_post(shared_memory->sem_fila);
     return true;
 }
 
@@ -267,17 +277,17 @@ void SIGTSTP_HANDLER(int signum) {
     printf("Total de tarefas executadas: %d\n", count);
 
     // Tempo medio de cada tarefa
-    float tempo_medio = (float) shared_memory->tempo_medio / (float) count;
+    float tempo_medio = (float)shared_memory->tempo_medio / (float)count;
     printf("Tempo medio de espera das Tarefas: %4fs\n", tempo_medio);
 
     // Numero de tarefas executadas por cada E Server
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        printf("Tarefas executadas pelo Edge Server %d: %d\n", i+1, servers[i].tarefas_executadas);
+        printf("Tarefas executadas pelo Edge Server %d: %d\n", i + 1, servers[i].tarefas_executadas);
     }
 
     // Numero de manutencoes de cada E Sever
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        printf("Numero de manutencoes do Edge Server %d: %d\n", i+1, servers[i].manutencoes);
+        printf("Numero de manutencoes do Edge Server %d: %d\n", i + 1, servers[i].manutencoes);
     }
 
     // Num de tarefas nao executadas
@@ -291,10 +301,7 @@ void SIGINT_HANDLER(int signum) {
     // Esperar que as threads dos Edge Servers terminem
 
     log_msg("Esperando as ultimas tarefas terminarem", 0); // TODO:
-    // for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-    //     pthread_join(servers[i].vCPU[0], NULL);
-    //     pthread_join(servers[i].vCPU[1], NULL);
-    // }
+
 
     // TODO: terminar a MQ
     msgctl(MQid, IPC_RMID, 0);
@@ -305,11 +312,15 @@ void SIGINT_HANDLER(int signum) {
     sem_close(shared_memory->sem_ficheiro);
     sem_close(shared_memory->sem_SM);
     sem_close(shared_memory->sem_servers);
+    sem_close(shared_memory->sem_performace);
+    sem_close(shared_memory->sem_fila);
     sem_unlink("SEM_MANUTENCAO");
     sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
     sem_unlink("SEM_SM");
     sem_unlink("SEM_SERVERS");
+    sem_unlink("SEM_PERFORMACE");
+    sem_unlink("SEM_FILA");
 
     kill(shared_memory->maintenance_pid, SIGKILL);
     kill(shared_memory->monitor_pid, SIGKILL);

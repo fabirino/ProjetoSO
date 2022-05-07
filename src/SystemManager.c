@@ -26,11 +26,13 @@ int main(int argc, char *argv[]) {
     sem_unlink("SEM_SM");
     sem_unlink("SEM_SERVERS");
     sem_unlink("SEM_PERFORMACE");
+    sem_unlink("SEM_FILA");
     shared_memory->sem_manutencao = sem_open("SEM_MANUTENCAO", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_tarefas = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_ficheiro = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_servers = sem_open("SEM_SERVERS", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_performace = sem_open("SEM_PERFORMACE", O_CREAT | O_EXCL, 0700, 1);
+    shared_memory->sem_fila = sem_open("SEM_FILA", O_CREAT | O_EXCL, 0700, 1);
     // Semaforo para ler e escrever da Shared Memory
     shared_memory->sem_SM = sem_open("SEM_SM", O_CREAT | O_EXCL, 0700, 1);
 

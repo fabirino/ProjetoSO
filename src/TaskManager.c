@@ -14,15 +14,18 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
         // Verificar os ES que estao livres
         sem_wait(shared_memory->sem_SM);
         sem_wait(shared_memory->sem_performace);
+        sem_wait(shared_memory->sem_fila);
         pthread_mutex_lock(&shared_memory->mutex_dispatcher);
         while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (shared_memory->Num_es_ativos == (shared_memory->EDGE_SERVER_NUMBER * 2)))) {
             printf("DEBUG: while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
             sem_post(shared_memory->sem_performace);
             sem_post(shared_memory->sem_SM);
+            sem_post(shared_memory->sem_fila);
             pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
         }
         sem_post(shared_memory->sem_performace);
         sem_post(shared_memory->sem_SM);
+        sem_post(shared_memory->sem_fila);
         pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
 
         sem_wait(shared_memory->sem_servers);
@@ -41,7 +44,9 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                 sem_wait(shared_memory->sem_SM);
                 if (servers[i].es_ativo == 0) {
                     sem_post(shared_memory->sem_SM);
+                    sem_wait(shared_memory->sem_fila);
                     printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
+                    sem_post(shared_memory->sem_fila);
                     // TODO:
 
                     if (received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) { // FIXME: verficar esta condicao
@@ -50,10 +55,10 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
                             perror("Erro ao escrever no pipe:");
                         }
-                        sem_wait(shared_memory->sem_SM);
+                        sem_wait(shared_memory->sem_fila);
                         shared_memory->n_tarefas--;
                         pthread_cond_signal(&shared_memory->cond_monitor);
-                        sem_post(shared_memory->sem_SM);
+                        sem_post(shared_memory->sem_fila);
                         possivel = 1;
                         break;
                     }
@@ -64,8 +69,10 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                 sem_wait(shared_memory->sem_SM);
                 if (servers[i].es_ativo < 2) {
                     sem_post(shared_memory->sem_SM);
+                    sem_wait(shared_memory->sem_fila);
                     printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
-                    if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo && servers[i].cpu_ativo[0] == 0) || (received_msg.num_instrucoes / servers[i].mips2 > received_msg.max_tempo && servers[i].cpu_ativo[1] == 0)) {
+                    sem_post(shared_memory->sem_fila);
+                    if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo ) || (received_msg.num_instrucoes / servers[i].mips2 < received_msg.max_tempo)) {
                         int tempo_espera = time(NULL) - received_msg.tempo_chegada;
                         // sem_wait(shared_memory->sem_estatisticas);
                         shared_memory->tempo_medio += tempo_espera;
@@ -74,10 +81,10 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
                             perror("Erro ao escrever no pipe:");
                         }
-                        sem_wait(shared_memory->sem_SM);
+                        sem_wait(shared_memory->sem_fila);
                         shared_memory->n_tarefas--;
                         pthread_cond_signal(&shared_memory->cond_monitor);
-                        sem_post(shared_memory->sem_SM);
+                        sem_post(shared_memory->sem_fila);
                         possivel = 1;
                         break;
                     }
@@ -87,10 +94,10 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             if (possivel == 0 && i == shared_memory->EDGE_SERVER_NUMBER) {
                 char mensagem[200];
                 snprintf(mensagem, 200, "Tempo insuficiente para executar a tarefa %d", received_msg.idTarefa);
-                sem_wait(shared_memory->sem_SM);
+                sem_wait(shared_memory->sem_fila);
                 shared_memory->n_tarefas--;
                 pthread_cond_signal(&shared_memory->cond_monitor);
-                sem_post(shared_memory->sem_SM);
+                sem_post(shared_memory->sem_fila);
                 sem_post(shared_memory->sem_servers);
                 log_msg(mensagem, 0);
             }
@@ -137,15 +144,12 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
 
             sem_post(shared_memory->sem_performace);
             sem_wait(shared_memory->sem_SM);
-            if (shared_memory->mode_cpu == 1) { // Modo Normal
-                shared_memory->Num_es_ativos++;
-                servers[i].es_ativo = 1;
-            } else { // Modo HP
-                shared_memory->Num_es_ativos += 2;
-                servers[i].es_ativo = 2;
-                servers[i].cpu_ativo[0] = 1;
-                servers[i].cpu_ativo[1] = 1;
-            }
+
+            shared_memory->Num_es_ativos += 2;
+            servers[i].es_ativo = 2;
+            servers[i].cpu_ativo[0] = 1;
+            servers[i].cpu_ativo[1] = 1;
+
             sem_post(shared_memory->sem_SM);
             sem_post(shared_memory->sem_servers);
 
@@ -166,13 +170,11 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             sem_post(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
             sem_wait(shared_memory->sem_SM);
             servers[i].es_ativo = 0;
-            if (shared_memory->mode_cpu == 1) {
-                shared_memory->Num_es_ativos--;
-            } else {
-                shared_memory->Num_es_ativos -= 2;
-                servers[i].cpu_ativo[0] = 0;
-                servers[i].cpu_ativo[1] = 0;
-            }
+
+            shared_memory->Num_es_ativos -= 2;
+            servers[i].cpu_ativo[0] = 0;
+            servers[i].cpu_ativo[1] = 0;
+
             servers[i].em_manutencao = 0;
             sem_post(shared_memory->sem_SM);
             pthread_cond_signal(&shared_memory->cond_dispatcher);
@@ -278,21 +280,23 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
 
                     // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
                     // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
-                    reoorganizar(&MQ,time(NULL));
+                    sem_wait(shared_memory->sem_fila);
+                    reoorganizar(&MQ, time(NULL));
+                    sem_post(shared_memory->sem_fila);
                     if (colocar(&MQ, tarefa, tarefa.max_tempo) == false) {
                         snprintf(temp, BUFSIZE, "[SCHEDULER]: A lista de tarefas esta cheia, tarefa %d ignorada", tarefa.idTarefa);
                         log_msg(temp, 0);
                         shared_memory->tarefas_descartadas++;
                     } else {
+                        char temp[BUFSIZE];
+                        sem_wait(shared_memory->sem_fila);
                         tarefa.tempo_chegada = time(NULL);
-                        sem_wait(shared_memory->sem_SM);
                         MQ.n_tarefas++;
                         shared_memory->n_tarefas++;
                         pthread_cond_signal(&shared_memory->cond_monitor);
-                        sem_post(shared_memory->sem_SM);
-                        pthread_cond_signal(&shared_memory->cond_dispatcher);
-                        char temp[BUFSIZE];
                         snprintf(temp, BUFSIZE, "[SCHEDULER]: Tarefa inserida na fila nº %d", MQ.n_tarefas);
+                        sem_post(shared_memory->sem_fila);
+                        pthread_cond_signal(&shared_memory->cond_dispatcher);
                         log_msg(temp, 0);
                     }
                 }
