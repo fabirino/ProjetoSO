@@ -25,23 +25,30 @@ int main(int argc, char *argv[]) {
     sem_unlink("SEM_FICHEIRO");
     sem_unlink("SEM_SM");
     sem_unlink("SEM_SERVERS");
+    sem_unlink("SEM_PERFORMACE");
     shared_memory->sem_manutencao = sem_open("SEM_MANUTENCAO", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_tarefas = sem_open("SEM_TAREFAS", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_ficheiro = sem_open("SEM_FICHEIRO", O_CREAT | O_EXCL, 0700, 1);
     shared_memory->sem_servers = sem_open("SEM_SERVERS", O_CREAT | O_EXCL, 0700, 1);
+    shared_memory->sem_performace = sem_open("SEM_PERFORMACE", O_CREAT | O_EXCL, 0700, 1);
     // Semaforo para ler e escrever da Shared Memory
     shared_memory->sem_SM = sem_open("SEM_SM", O_CREAT | O_EXCL, 0700, 1);
 
     // Variavel de condicao e semaforo TODO: testando da para alterar a variavel de condicao noutro processo
     pthread_mutexattr_init(&mattr);
     pthread_condattr_init(&cattr);
+
     pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
     pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
 
     pthread_mutex_init(&shared_memory->mutex_dispatcher, &mattr);
     pthread_cond_init(&shared_memory->cond_dispatcher, &cattr);
+
     pthread_mutex_init(&shared_memory->mutex_manutencao, &mattr);
     pthread_cond_init(&shared_memory->cond_manutencao, &cattr);
+
+    pthread_mutex_init(&shared_memory->mutex_monitor, &mattr);
+    pthread_cond_init(&shared_memory->cond_monitor, &cattr);
 
     log_msg("O programa iniciou", 1);
 
@@ -76,21 +83,37 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
 
-        // while (1) { // TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
-        //     if (shared_memory->mode_cpu == 1) {
-        //         int tempo = 5; // FIXME:
-        //         if (shared_memory->n_tarefas >= shared_memory->QUEUE_POS * 0.8 && tempo >= shared_memory->MAX_WAIT) {
-        //             log_msg("O Sistema entrou em High Performance", 0);
-        //             shared_memory->mode_cpu = 2;
-        //         }
-        //     } else if (shared_memory->mode_cpu == 2) {
-        //         if (shared_memory->n_tarefas <= shared_memory->QUEUE_POS * 0.2) {
-        //             log_msg("O Sistema voltou ao modo Normal", 0);
-        //             shared_memory->mode_cpu = 1;
-        //         }
-        //     }
-        //     sleep(1); // Fica lento sem o sleep, entao so verifica a cada 1s
-        // }
+        while (1) { // TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
+
+            sem_wait(shared_memory->sem_SM);
+            sem_wait(shared_memory->sem_performace);
+            pthread_mutex_lock(&shared_memory->mutex_monitor);
+            while (((shared_memory->mode_cpu == 1) && (shared_memory->n_tarefas < shared_memory->QUEUE_POS * 0.8 /*&& tempo < shared_memory->MAX_WAIT*/)) ||  ((shared_memory->mode_cpu == 2) && (shared_memory->n_tarefas > shared_memory->QUEUE_POS * 0.2))) {
+                sem_post(shared_memory->sem_performace);
+                sem_post(shared_memory->sem_SM);
+                pthread_cond_wait(&shared_memory->cond_monitor, &shared_memory->mutex_monitor);
+            }
+            sem_post(shared_memory->sem_performace);
+            sem_post(shared_memory->sem_SM);
+            pthread_mutex_unlock(&shared_memory->mutex_monitor);
+
+            sem_wait(shared_memory->sem_performace);
+            if (shared_memory->mode_cpu == 1) {
+                sem_post(shared_memory->sem_performace);
+                int tempo = 5; // FIXME:
+                if (shared_memory->n_tarefas >= shared_memory->QUEUE_POS * 0.8 && tempo >= shared_memory->MAX_WAIT) {
+                    log_msg("O Sistema entrou em High Performance", 0);
+                    shared_memory->mode_cpu = 2;
+                }
+            } else if (shared_memory->mode_cpu == 2) {
+                sem_post(shared_memory->sem_performace);
+                if (shared_memory->n_tarefas <= shared_memory->QUEUE_POS * 0.2) {
+                    log_msg("O Sistema voltou ao modo Normal", 0);
+                    shared_memory->mode_cpu = 1;
+                }
+            }
+            // sleep(1); // Fica lento sem o sleep, entao so verifica a cada 1s
+        }
 
         exit(0);
     }
@@ -124,7 +147,7 @@ int main(int argc, char *argv[]) {
             // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
             // como e que o edge server responde ao MM??????????
 
-            time_t t;//FIXME: so gera os 2 primeiros, ver depois esta parte!!
+            time_t t; // FIXME: so gera os 2 primeiros, ver depois esta parte!!
             srand((unsigned)time(&t));
 
             int tempo = rand() % 5 + 1;
@@ -161,7 +184,7 @@ int main(int argc, char *argv[]) {
 
                 // sleep(tempo);
 
-                //msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
+                // msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
 
                 servers[servidor].manutencoes += 1;
             }
