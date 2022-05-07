@@ -88,8 +88,8 @@ int main(int argc, char *argv[]) {
         log_msg("O processo Monitor comecou", 0);
 
         // Ignore Signals in this process
-        // signal(SIGTSTP, SIG_IGN);
-        // signal(SIGINT, SIG_IGN);
+        signal(SIGTSTP, SIG_IGN);
+        signal(SIGINT, SIG_IGN);
 
         while (1) { // TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
 
@@ -146,8 +146,8 @@ int main(int argc, char *argv[]) {
         log_msg("O processo Maintenance Manager comecou", 0);
         
         // Ignore Signals in this process
-        // signal(SIGTSTP, SIG_IGN);
-        // signal(SIGINT, SIG_IGN);
+        signal(SIGTSTP, SIG_IGN);
+        signal(SIGINT, SIG_IGN);
         sleep(5);
 
         while (1) { // BUG: QUANDO COLOCA-SE ESTE WHILE FICA TODO LAGADO A VM!!!!!!! RESORVER NS COMO
