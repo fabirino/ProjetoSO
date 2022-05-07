@@ -34,7 +34,7 @@ typedef struct {
     int idTarefa;
     int num_instrucoes;
     int max_tempo;
-    int tempo_chegada;
+    time_t tempo_chegada;
 } Task;
 
 typedef struct {
@@ -64,6 +64,8 @@ bool colocar(base *pf, Task tarefa, int prioridade);
 bool retirar(base *pf, Task *ptarefa);
 
 void inicializar(base *pf);
+
+void reoorganizar(base *pf, time_t tempo);
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
