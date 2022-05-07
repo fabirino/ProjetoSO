@@ -28,32 +28,13 @@
 #define READ 0
 #define WRITE 1
 
-int MQid;
-
-// typedef struct {
-//     /* Message type */
-//     long priority;
-//     /* Payload */
-//     int msg_number; // TODO: usar este numero para saber quantas tarefas estao por terminar quando o programa acabar
-//     // dados
-//     int idTarefa;
-//     int num_instrucoes;
-//     int max_tempo;
-// } priority_msg;
-
-typedef struct {
-    /*Message Type*/
-    long priority;
-    /*Payload*/
-    int temp_man;
-} priority_msg;
-
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 typedef struct {
     // dados
     int idTarefa;
     int num_instrucoes;
     int max_tempo;
+    int tempo_chegada;
 } Task;
 
 typedef struct {
@@ -73,7 +54,7 @@ typedef struct {
 } no_fila;
 
 typedef struct {
-    no_fila *nos; // dados
+    no_fila *nos;
     int n_tarefas;
     int entrada_lista;
 } base;
@@ -85,6 +66,15 @@ bool retirar(base *pf, Task *ptarefa);
 void inicializar(base *pf);
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+
+int MQid;
+
+typedef struct {
+    /*Message Type*/
+    long priority;
+    /*Payload*/
+    int temp_man;
+} priority_msg;
 
 typedef struct {
     char nome[50];
@@ -112,17 +102,18 @@ typedef struct shared_memory {
     int EDGE_SERVER_NUMBER;
 
     int n_tarefas;
+    int tempo_medio;
 
     pid_t TM_pid;
     pid_t monitor_pid;
     pid_t maintenance_pid;
 
-    sem_t *sem_manutencao; // semaforo usado para parar os Edge Servers
+    sem_t *sem_manutencao; // Semaforo usado para parar os Edge Servers
     sem_t *sem_tarefas;    // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
-    sem_t *sem_ficheiro;   // nao haverem 2 processos a escreverem no log ao mesmo tempo
+    sem_t *sem_ficheiro;   // Semaforo para escrever no ficheiro log
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
-    sem_t *sem_servers;    // semafro para esperar para que
-    sem_t *sem_performace;  
+    sem_t *sem_servers;    // Semaforo para esperar para que
+    sem_t *sem_performace; // 
 
     pthread_mutex_t mutex_dispatcher; // semaforo para as threads
     pthread_cond_t cond_dispatcher;   // variavel de condicao que muda de Normal para HP
@@ -130,7 +121,6 @@ typedef struct shared_memory {
     pthread_cond_t cond_manutencao; 
     pthread_mutex_t mutex_monitor; 
     pthread_cond_t cond_monitor;     
-
 
     int Num_es_ativos; // numero de edge servers ativos!!
 
@@ -167,6 +157,6 @@ void task_manager();
 
 void server(int i);
 
-void *ES_routine(void *t);
+void *vCPU_routine(void *t);
 
 #endif

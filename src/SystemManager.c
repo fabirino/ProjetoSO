@@ -71,6 +71,10 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+    // Catch signals by main process
+    signal(SIGTSTP, SIGTSTP_HANDLER);
+    signal(SIGINT, SIGINT_HANDLER);
+
     log_msg("O TASK_PIPE iniciou", 0);
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -82,6 +86,10 @@ int main(int argc, char *argv[]) {
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
+
+        // Ignore Signals in this process
+        // signal(SIGTSTP, SIG_IGN);
+        // signal(SIGINT, SIG_IGN);
 
         while (1) { // TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
 
@@ -100,15 +108,15 @@ int main(int argc, char *argv[]) {
             sem_wait(shared_memory->sem_performace);
             if (shared_memory->mode_cpu == 1) {
                 sem_post(shared_memory->sem_performace);
-                int tempo = 5; // FIXME:
+                int tempo = 5; // FIXME: sempre true
                 if (shared_memory->n_tarefas >= shared_memory->QUEUE_POS * 0.8 && tempo >= shared_memory->MAX_WAIT) {
-                    log_msg("O Sistema entrou em High Performance", 0);
+                    log_msg("[MONITOR]: O Sistema entrou em High Performance", 0);
                     shared_memory->mode_cpu = 2;
                 }
             } else if (shared_memory->mode_cpu == 2) {
                 sem_post(shared_memory->sem_performace);
                 if (shared_memory->n_tarefas <= shared_memory->QUEUE_POS * 0.2) {
-                    log_msg("O Sistema voltou ao modo Normal", 0);
+                    log_msg("[MONITOR]: O Sistema voltou ao modo Normal", 0);
                     shared_memory->mode_cpu = 1;
                 }
             }
@@ -121,26 +129,25 @@ int main(int argc, char *argv[]) {
     if ((shared_memory->TM_pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
 
-        // Catch Signals
+        // Ignore Signals in this process
+        // signal(SIGTSTP, SIG_IGN);
+        // signal(SIGINT, SIG_IGN);
 
         task_manager();
 
-        // Catch Signals
-        signal(SIGTSTP, SIGTSTP_HANDLER);
-        signal(SIGINT, SIGINT_HANDLER);
         while (wait(NULL) > 0)
             ;
 
         exit(0);
     }
 
-    // // Ignorar os sinais nos seguintes processos para nao haver prints duplicados
-    // signal(SIGTSTP, SIG_IGN);
-    // signal(SIGINT, SIG_IGN);
-
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {
         log_msg("O processo Maintenance Manager comecou", 0);
+        
+        // Ignore Signals in this process
+        // signal(SIGTSTP, SIG_IGN);
+        // signal(SIGINT, SIG_IGN);
         sleep(5);
 
         while (1) { // BUG: QUANDO COLOCA-SE ESTE WHILE FICA TODO LAGADO A VM!!!!!!! RESORVER NS COMO
@@ -178,7 +185,7 @@ int main(int argc, char *argv[]) {
                 my_msg.priority = servidor;
                 my_msg.temp_man = tempo;
                 msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
-                printf("manutencao server n_[%d]\n", servidor);
+                printf("DEBUG: manutencao server n_[%d]\n", servidor+1);
 
                 // tempo = rand() % 5 + 1;
 
@@ -192,10 +199,6 @@ int main(int argc, char *argv[]) {
 
         exit(0);
     }
-
-    // Catch Signals
-    // signal(SIGTSTP, SIGTSTP_HANDLER);
-    // signal(SIGINT, SIGINT_HANDLER);
 
     while (wait(NULL) > 0)
         ;

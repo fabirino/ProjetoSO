@@ -3,6 +3,115 @@
 
 #include "auxiliar.h"
 
+/* Funcoes da lista ligada*/
+
+void inicializar(base *pf) {
+    pf->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
+    pf->n_tarefas = 0;
+    // a fila está inicialmente vazia
+    pf->entrada_lista = shared_memory->QUEUE_POS - 1;
+    for (int i = 0; i < shared_memory->QUEUE_POS; i++)
+        pf->nos[i].ocupado = false;
+}
+
+void reoorganizar(base *pf, time_t tempo) { // Insertion Sort (Geeks for Geeks)
+    // Acho que nao precisamos de reorganizar pq nos inserimos na lista logo por ordem
+
+    // int i, key, j;
+    // for (i = 1; i < pf->n_tarefas; i++) {
+    //     key = pf->nos[i].prioridade;
+    //     j = i - 1;
+
+    //     while (j >= 0 && pf->nos[j].prioridade > key) {
+    //         pf->nos[j + 1] = pf->nos[j];
+    //         j = j - 1;
+    //     }
+    //     pf->nos[j + 1].prioridade = key;
+    // }
+
+    // // DEBUG: esta mal por causa da mens_seguinte muito provavelmente
+    // printf("\n\n mostrar array ordenado: ");
+    // for (int a = 0; a < pf->n_tarefas; a++) {
+    //     printf("%d  ", pf->nos[a].prioridade);
+    // }
+    // printf("\n");
+}
+
+bool colocar(base *pf, Task tarefa, int prioridade) {
+    int i, anterior, prox;
+    // Procurar uma posição disponível
+    for (i = shared_memory->QUEUE_POS - 1; i >= 0 && pf->nos[i].ocupado; i--)
+        ;
+    if (i < 0) {
+        // fila cheia - não é possível inserir mais nada
+        return false;
+    }
+    // colocar mensagem na fila
+    pf->nos[i].tarefa = tarefa;
+    pf->nos[i].prioridade = prioridade;
+
+    // Procurar a posição onde a mensagem deve ficar
+    if (!(pf->nos[pf->entrada_lista].ocupado)) {
+        // fila vazia, inserir primeira mensagem
+        pf->entrada_lista = i;
+        pf->nos[i].mens_seguinte = -1;
+    } else {
+        // fila contém mensagens
+        if (pf->nos[pf->entrada_lista].prioridade >= prioridade) {
+            // inserir à entrada da lista
+            pf->nos[i].mens_seguinte = pf->entrada_lista;
+            pf->entrada_lista = i;
+        } else {
+            // procurar posição de inserção
+            anterior = pf->entrada_lista;
+            prox = pf->nos[pf->entrada_lista].mens_seguinte;
+            while (prox >= 0 && pf->nos[prox].prioridade < prioridade) {
+                anterior = prox;
+                prox = pf->nos[prox].mens_seguinte;
+            }
+            if (prox < 0) {
+                // inserir nos final da lista
+                pf->nos[anterior].mens_seguinte = i;
+                pf->nos[i].mens_seguinte = -1;
+            } else {
+                // inserir a meio da lista
+                pf->nos[anterior].mens_seguinte = i;
+                pf->nos[i].mens_seguinte = prox;
+            }
+        }
+    }
+    pf->nos[i].ocupado = true;
+
+    // reoorganizar(pf, 0);
+
+    return true;
+}
+
+bool retirar(base *pf, Task *ptarefa) {
+    int i, j;
+    if (!pf->nos[pf->entrada_lista].ocupado) {
+        // lista vazia
+        return false;
+    }
+
+    //  Procurar a última mensagem da lista
+    j = -1;
+    for (i = pf->entrada_lista; pf->nos[i].mens_seguinte != -1; i = pf->nos[i].mens_seguinte)
+        j = i; // guardar a localização da mensagem anterior à que vai sair
+
+    if (j != -1)
+        // havia mais do que uma mensagem na lista
+        pf->nos[j].mens_seguinte = -1;
+
+    pf->nos[i].ocupado = false;
+    *ptarefa = pf->nos[i].tarefa;
+    pf->n_tarefas--;
+
+    return true;
+}
+
+//#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+
 // devolve o tempo formatado
 void time_now(char *string) {
     time_t tempo = time(NULL);
@@ -77,10 +186,11 @@ void config(char *path) {
     }
     fclose(fich);
 
-    // Inicializar o array que mostra o numero de ES ativos
+    // Inicializar variaveis da SM
     shared_memory->mode_cpu = 1;
     shared_memory->Num_es_ativos = 0;
     shared_memory->n_tarefas = 0;
+    shared_memory->tempo_medio = 0;
 }
 
 // funcao que cria os edge servers com base nos dados obtidos no ficheiro config
@@ -127,102 +237,22 @@ void createEdgeServers(char *path) {
         num++;
     }
     fclose(fich);
+
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        /* code */
         servers[i].es_ativo = 0;
         for (int l = 0; l < 2; l++) {
             servers[i].cpu_ativo[l] = 0;
         }
         servers[i].em_manutencao = 0;
-    }
-}
 
-//#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
-
-void inicializar(base *pf) {
-    pf->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
-    pf->n_tarefas = 0;
-    // a fila está inicialmente vazia
-    pf->entrada_lista = shared_memory->QUEUE_POS - 1;
-    for (int i = 0; i < shared_memory->QUEUE_POS; i++)
-        pf->nos[i].ocupado = false;
-}
-
-bool colocar(base *pf, Task tarefa, int prioridade) {
-    int i, anterior, prox;
-    // Procurar uma posição disponível
-    for (i = shared_memory->QUEUE_POS - 1; i >= 0 && pf->nos[i].ocupado; i--)
-        ;
-    if (i < 0) {
-        // fila cheia - não é possível inserir mais nada
-        return false;
-    }
-    // colocar mensagem na fila
-    pf->nos[i].tarefa = tarefa;
-    pf->nos[i].prioridade = prioridade;
-
-    // Procurar a posição onde a mensagem deve ficar
-    if (!(pf->nos[pf->entrada_lista].ocupado)) {
-        // fila vazia, inserir primeira mensagem
-        pf->entrada_lista = i;
-        pf->nos[i].mens_seguinte = -1;
-    } else {
-        // fila contém mensagens
-        if (pf->nos[pf->entrada_lista].prioridade >= prioridade) {
-            // inserir à entrada da lista
-            pf->nos[i].mens_seguinte = pf->entrada_lista;
-            pf->entrada_lista = i;
-        } else {
-            // procurar posição de inserção
-            anterior = pf->entrada_lista;
-            prox = pf->nos[pf->entrada_lista].mens_seguinte;
-            while (prox >= 0 && pf->nos[prox].prioridade < prioridade) {
-                anterior = prox;
-                prox = pf->nos[prox].mens_seguinte;
-            }
-            if (prox < 0) {
-                // inserir nos final da lista
-                pf->nos[anterior].mens_seguinte = i;
-                pf->nos[i].mens_seguinte = -1;
-            } else {
-                // inserir a meio da lista
-                pf->nos[anterior].mens_seguinte = i;
-                pf->nos[i].mens_seguinte = prox;
-            }
+        // considerar o vcpu1 o menos eficaz
+        if (servers[i].mips2 > servers[i].mips1) {
+            int aux = servers[i].mips1;
+            servers[i].mips1 = servers[i].mips2;
+            servers[i].mips2 = aux;
         }
     }
-    pf->nos[i].ocupado = true;
-    return true;
 }
-
-bool retirar(base *pf, Task *ptarefa) {
-    int i, j;
-    if (!pf->nos[pf->entrada_lista].ocupado) {
-        // lista vazia
-        return false;
-    }
-
-    //  Procurar a última mensagem da lista
-    j = -1;
-    for (i = pf->entrada_lista; pf->nos[i].mens_seguinte != -1; i = pf->nos[i].mens_seguinte)
-        j = i; // guardar a localização da mensagem anterior à que vai sair
-
-    if (j != -1)
-        // havia mais do que uma mensagem na lista
-        pf->nos[j].mens_seguinte = -1;
-
-    pf->nos[i].ocupado = false;
-    *ptarefa = pf->nos[i].tarefa;
-    pf->n_tarefas--;
-
-    return true;
-}
-
-void reoorganizar(base *pf, time_t tempo) {
-    // TODO: code here/*
-}
-
-//#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
 // Funcao que trata do CTRL-Z (imprime as estatisticas)
 void SIGTSTP_HANDLER(int signum) {
@@ -236,17 +266,18 @@ void SIGTSTP_HANDLER(int signum) {
     }
     printf("Total de tarefas executadas: %d\n", count);
 
-    // TODO:Tempo medio de cada tarefa
-    printf("Tempo medio de cada Tarefa: 0s\n");
+    // Tempo medio de cada tarefa
+    float tempo_medio = (float) shared_memory->tempo_medio / (float) count;
+    printf("Tempo medio de espera das Tarefas: %4fs\n", tempo_medio);
 
     // Numero de tarefas executadas por cada E Server
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        printf("Tarefas executadas pelo Edge Server %d: %d\n", i, servers[i].tarefas_executadas);
+        printf("Tarefas executadas pelo Edge Server %d: %d\n", i+1, servers[i].tarefas_executadas);
     }
 
     // Numero de manutencoes de cada E Sever
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        printf("Numero de manutencoes do Edge Server %d: %d\n", i, servers[i].manutencoes);
+        printf("Numero de manutencoes do Edge Server %d: %d\n", i+1, servers[i].manutencoes);
     }
 
     // Num de tarefas nao executadas
@@ -257,8 +288,7 @@ void SIGTSTP_HANDLER(int signum) {
 void SIGINT_HANDLER(int signum) {
     printf("\n");
     log_msg("Sinal SIGINT recebido", 0);
-    // DEBUG: nao pode ser desta maneira, uma ideia é ter um array na shared memory em que 0 esta a funcionar e 1 esta ligado e verificar se estao a 0 e nao deixar comecar mais tarefas!!
-    //  // Esperar que as threads dos Edge Servers terminem
+    // Esperar que as threads dos Edge Servers terminem
 
     log_msg("Esperando as ultimas tarefas terminarem", 0); // TODO:
     // for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {

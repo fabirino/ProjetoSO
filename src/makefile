@@ -11,7 +11,6 @@ PROG2	= mobile_node
 OBJS2	= MobileNode.o auxiliar.o
 
 # $@ nome do target
-# $< primeiro pre requesito (?)
 
 all:	${PROG1} ${PROG2} clean
 

@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     int num_instrucoes = atoi(argv[1]);
     int max_tempo = atoi(argv[4]);
 
-    int intervalo_tempo = atoi(argv[2]); //QUESTION: e aqui multiplicar por 0.001 uma vez que sao em milisegundos
+    int intervalo_tempo = atoi(argv[2]);
     int mips = atoi(argv[3]);
 
     // ID tarefa; Nº de instruções (em milhares); Tempo máximo para execução
