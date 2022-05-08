@@ -72,7 +72,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                     sem_wait(shared_memory->sem_fila);
                     printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
                     sem_post(shared_memory->sem_fila);
-                    if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo ) || (received_msg.num_instrucoes / servers[i].mips2 < received_msg.max_tempo)) {
+                    if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) || (received_msg.num_instrucoes / servers[i].mips2 < received_msg.max_tempo)) {
                         int tempo_espera = time(NULL) - received_msg.tempo_chegada;
                         // sem_wait(shared_memory->sem_estatisticas);
                         shared_memory->tempo_medio += tempo_espera;
@@ -91,16 +91,16 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                 } else
                     continue;
             }
-            if (possivel == 0 && i == shared_memory->EDGE_SERVER_NUMBER) {
-                char mensagem[200];
-                snprintf(mensagem, 200, "Tempo insuficiente para executar a tarefa %d", received_msg.idTarefa);
-                sem_wait(shared_memory->sem_fila);
-                shared_memory->n_tarefas--;
-                pthread_cond_signal(&shared_memory->cond_monitor);
-                sem_post(shared_memory->sem_fila);
-                sem_post(shared_memory->sem_servers);
-                log_msg(mensagem, 0);
-            }
+        }
+        if (possivel == 0) {
+            char mensagem[200];
+            snprintf(mensagem, 200, "Tempo insuficiente para executar a tarefa %d", received_msg.idTarefa);
+            sem_wait(shared_memory->sem_fila);
+            shared_memory->n_tarefas--;
+            pthread_cond_signal(&shared_memory->cond_monitor);
+            sem_post(shared_memory->sem_fila);
+            sem_post(shared_memory->sem_servers);
+            log_msg(mensagem, 0);
         }
         sleep(1); // DEBUG: desbugar a vm necessita deste sleep ns pq
     }
@@ -280,14 +280,17 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
 
                     // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
                     // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
+                    //sem_wait(shared_memory->sem_fila);
+                    //reoorganizar(&MQ, time(NULL));
+                    //sem_post(shared_memory->sem_fila);
                     sem_wait(shared_memory->sem_fila);
-                    reoorganizar(&MQ, time(NULL));
-                    sem_post(shared_memory->sem_fila);
                     if (colocar(&MQ, tarefa, tarefa.max_tempo) == false) {
+                        sem_post(shared_memory->sem_fila);
                         snprintf(temp, BUFSIZE, "[SCHEDULER]: A lista de tarefas esta cheia, tarefa %d ignorada", tarefa.idTarefa);
                         log_msg(temp, 0);
                         shared_memory->tarefas_descartadas++;
                     } else {
+                        sem_post(shared_memory->sem_fila);
                         char temp[BUFSIZE];
                         sem_wait(shared_memory->sem_fila);
                         tarefa.tempo_chegada = time(NULL);
