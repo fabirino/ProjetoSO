@@ -14,27 +14,76 @@ void inicializar(base *pf) {
         pf->nos[i].ocupado = false;
 }
 
-void reoorganizar(base *pf, time_t tempo) { // Insertion Sort (Geeks for Geeks)
-    // Acho que nao precisamos de reorganizar pq nos inserimos na lista logo por ordem
+void reoorganizar(base *pf, struct timeval tempo) { // Insertion Sort (Geeks for Geeks)
+                                                    // Acho que nao precisamos de reorganizar pq nos inserimos na lista logo por ordem
 
     // int i, key, j;
-    // for (int i = 0; i < shared_memory->QUEUE_POS; i++) {
-    //     if (pf->nos->ocupado == true) {
-    //         time_t t = tempo - pf->nos[i].tarefa.tempo_chegada;
-    //         pf->nos[i].tarefa.max_tempo -= t;
-    //         if (pf->nos[i].tarefa.max_tempo <= 0) {
-    //             char mensagem[200];
-    //             snprintf(mensagem, 200, "[SCHEDULER]: Tempo insuficiente para executar a tarefa %d", pf->nos[i].tarefa.idTarefa);
-    //             pf->nos[i].ocupado = false;
-    //             pf->n_tarefas--;
-    //             shared_memory->n_tarefas--;
+    // if (pf->entrada_lista = -1) {
+    //     return;
+    // } else {
 
-    //             log_msg(mensagem, 0);
+    //     char mens[BUFSIZE];
+    //     int primeira = 0;
+    //     while (primeira == 0) {
+    //         long double intervalo = (long double)(tempo.tv_usec - pf->nos[pf->entrada_lista].tarefa.tempo_chegada.tv_usec) / 1000000 + (long double)(tempo.tv_sec - pf->nos[pf->entrada_lista].tarefa.tempo_chegada.tv_sec);
+    //         if (intervalo < 1000000) {
+    //             if (intervalo <= 0) {
+    //                 memset(mens, 0, BUFSIZE);
+    //                 snprintf(mens, 0, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada!", pf->nos[pf->entrada_lista].tarefa.idTarefa);
+    //                 pf->nos[pf->entrada_lista].ocupado = false;
+    //                 pf->n_tarefas--;
+    //                 shared_memory->n_tarefas--;
+    //                 if (pf->nos[pf->entrada_lista].mens_seguinte != -1)
+    //                     pf->entrada_lista = pf->nos[pf->entrada_lista].mens_seguinte;
+    //                 else {
+    //                     pf->entrada_lista = -1;
+    //                     primeira = 1;
+    //                 }
+
+    //                 log_msg(mens, 0);
+    //             } else {
+    //                 pf->nos[pf->entrada_lista].tarefa.max_tempo = intervalo;
+    //                 if (intervalo <= 1) {
+    //                     pf->nos[pf->entrada_lista].prioridade = 1;
+    //                 } else {
+    //                     pf->nos[pf->entrada_lista].prioridade = (int)pf->nos[pf->entrada_lista].tarefa.max_tempo;
+    //                 }
+    //                 primeira = 1;
+    //             }
     //         } else {
-    //             if (pf->nos[i].tarefa.max_tempo < 1)
-    //                 pf->nos[i].prioridade = 1;
-    //             else
-    //                 pf->nos[i].prioridade = (int)pf->nos[i].tarefa.max_tempo;
+    //             primeira = 1;
+    //         }
+    //     }
+    //     if (pf->entrada_lista != -1) {
+
+    //         int prox = pf->entrada_lista;
+
+    //         while (pf->nos[prox].mens_seguinte != -1) {
+    //             long double intervalo = (long double)(tempo.tv_usec - pf->nos[pf->nos[prox].mens_seguinte].tarefa.tempo_chegada.tv_usec) / 1000000 + (long double)(tempo.tv_sec - pf->nos[pf->nos[prox].mens_seguinte].tarefa.tempo_chegada.tv_sec);
+    //             if (intervalo < 1000000) {
+    //                 if (intervalo <= 0) {
+    //                     memset(mens, 0, BUFSIZE);
+    //                     snprintf(mens, 0, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada!", pf->nos[pf->nos[prox].mens_seguinte].tarefa.idTarefa);
+    //                     pf->nos[pf->nos[prox].mens_seguinte].ocupado = false;
+    //                     pf->n_tarefas--;
+    //                     shared_memory->n_tarefas--;
+    //                     if (pf->nos[pf->nos[prox].mens_seguinte].mens_seguinte != -1) {
+    //                         pf->nos[prox].mens_seguinte = pf->nos[pf->nos[prox].mens_seguinte].mens_seguinte;
+    //                     } else {
+    //                         pf->nos[prox].mens_seguinte = -1;
+    //                         break;
+    //                     }
+    //                     log_msg(mens, 0);
+    //                 } else {
+    //                     pf->nos[pf->entrada_lista].tarefa.max_tempo = intervalo;
+    //                     if (intervalo <= 1) {
+    //                         pf->nos[pf->entrada_lista].prioridade = 1;
+    //                     } else {
+    //                         pf->nos[pf->entrada_lista].prioridade = (int)pf->nos[pf->entrada_lista].tarefa.max_tempo;
+    //                     }
+    //                 }
+    //             }
+    //             prox = pf->nos[prox].mens_seguinte;
     //         }
     //     }
     // }
@@ -305,7 +354,6 @@ void SIGINT_HANDLER(int signum) {
 
     log_msg("Esperando as ultimas tarefas terminarem", 0); // TODO:
 
-
     // TODO: terminar a MQ
     msgctl(MQid, IPC_RMID, 0);
 
@@ -332,14 +380,17 @@ void SIGINT_HANDLER(int signum) {
     }
 
     // Remove shared_memory
-    shmdt(shared_memory);
-    shmctl(shmid, IPC_RMID, NULL);
-    shmdt(servers);
-    shmctl(shmserversid, IPC_RMID, NULL);
+    // if (shmdt(shared_memory)== -1){
+    //       perror("acoplamento impossivel") ;
+    //  }
+    //shmctl(shmid, IPC_RMID, NULL);
 
     kill(shared_memory->maintenance_pid, SIGKILL);
     kill(shared_memory->monitor_pid, SIGKILL);
     kill(shared_memory->TM_pid, SIGKILL);
+
+    shmdt(servers);
+    shmctl(shmserversid, IPC_RMID, NULL);
 
     log_msg("O programa terminou\n", 0);
     // FIXME: sempre que ha um kill() o programa acaba imediatamente

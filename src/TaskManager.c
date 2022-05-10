@@ -45,6 +45,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             }
             sem_post(shared_memory->sem_SM);
         }
+        retirar(&MQ, &received_msg);
         sem_post(shared_memory->sem_performace);
         sem_post(shared_memory->sem_SM);
         sem_post(shared_memory->sem_fila);
@@ -55,7 +56,6 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
         char temp[BUFSIZE];
         int possivel = 0;
 
-        retirar(&MQ, &received_msg);
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             if (possivel == 1)
                 break;
@@ -133,7 +133,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             sem_post(shared_memory->sem_servers);
             log_msg(mensagem, 0);
         }
-        sleep(0.2); // DEBUG: desbugar a vm necessita deste sleep ns pq
+        sleep(0.4); // DEBUG: desbugar a vm necessita deste sleep ns pq
     }
 
     pthread_exit(NULL);
@@ -305,7 +305,7 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
             } else if (!strcmp(mensagem, "STATS")) { // echo "STATS" > TASK_PIPE
                 // Imprime as estatisticas
                 SIGTSTP_HANDLER(1);
-            } else{
+            } else {
                 char temp[BUFSIZE];
                 snprintf(mensagem, BUFSIZE, "Comando errado => %s", mensagem);
                 log_msg(temp, 0);
@@ -336,17 +336,15 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                     log_msg(temp, 0);
                     shared_memory->tarefas_descartadas++;
                 } else {
-                    sem_post(shared_memory->sem_fila);
                     char temp[BUFSIZE];
-                    sem_wait(shared_memory->sem_fila);
                     time_t tempo;
                     time(&tempo);
                     tarefa.tempo_chegada = *localtime(&tempo);
                     MQ.n_tarefas++;
                     shared_memory->n_tarefas++;
-                    pthread_cond_signal(&shared_memory->cond_monitor);
                     snprintf(temp, BUFSIZE, "[SCHEDULER]: Tarefa inserida na fila nº %d", MQ.n_tarefas);
                     sem_post(shared_memory->sem_fila);
+                    pthread_cond_signal(&shared_memory->cond_monitor);
                     pthread_cond_signal(&shared_memory->cond_dispatcher);
                     log_msg(temp, 0);
                 }

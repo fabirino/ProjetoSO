@@ -65,7 +65,7 @@ bool retirar(base *pf, Task *ptarefa);
 
 void inicializar(base *pf);
 
-void reoorganizar(base *pf, time_t tempo);
+void reoorganizar(base *pf, struct timeval tempo);
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
