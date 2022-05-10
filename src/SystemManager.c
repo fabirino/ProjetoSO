@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
 
             // criar um array so com os ES que nao estao em manutencao no momento
             for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-                if (servers[i].em_manutencao == 0) {
+                if (servers[i].manutencao == 0) {
                     array[count++] = i;
                     existe = 1;
                 }

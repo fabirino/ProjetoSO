@@ -278,63 +278,66 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
         Task tarefa;
         int r;
         char mensagem[BUFSIZE];
+        memset(mensagem, 0, BUFSIZE);
         r = read(fd, &mensagem, sizeof(mensagem));
         if (r < 0)
             perror("Named Pipe");
+
         int kappa = 0;
         char *token;
         token = strtok(mensagem, ";");
+        int teste = 0;
+
+        // Verificar os sinais do echo
+        if (strlen(mensagem) <= 6) { // para nao confundir com as tarefas
+            mensagem[strlen(mensagem) - 1] = '\0';
+            if (!strcmp(mensagem, "EXIT")) { // echo "EXIT" > TASK_PIPE
+                // Acaba o programa
+                SIGINT_HANDLER(1);
+            } else if (!strcmp(mensagem, "STATS")) { // echo "STATS" > TASK_PIPE
+                // Imprime as estatisticas
+                SIGTSTP_HANDLER(1);
+            }
+        }
 
         // Decompor a string numa tarefa
         while (token != NULL) {
-            // printf("DEBUG: TOKEN = %s\n", token);
-            if (!strcmp(token, "EXIT") && kappa == 0) { // echo "EXIT" > TASK_PIPE
-                // Acaba o programa
-                SIGINT_HANDLER(1);
-                break;
-            } else if (!strcmp(token, "STATS") && kappa == 0) { // echo "STATS" > TASK_PIPE
-                // Imprime as estatisticas
-                SIGTSTP_HANDLER(1);
-                break;
-            } else {
-                if (kappa == 0)
-                    tarefa.idTarefa = atoi(token);
+            if (kappa == 0)
+                tarefa.idTarefa = atoi(token);
+            else if (kappa == 1)
+                tarefa.num_instrucoes = atoi(token);
+            else {
+                tarefa.max_tempo = atoi(token);
+                snprintf(temp, BUFSIZE, "[SCHEDULER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d",
+                         r, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
+                log_msg(temp, 0);
 
-                else if (kappa == 1)
-                    tarefa.num_instrucoes = atoi(token);
-                else {
-                    tarefa.max_tempo = atoi(token);
-                    snprintf(temp, BUFSIZE, "[SCHEDULER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d",
-                             r, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
+                // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
+                // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
+                // sem_wait(shared_memory->sem_fila);
+                // reoorganizar(&MQ, time(NULL));
+                // sem_post(shared_memory->sem_fila);
+                sem_wait(shared_memory->sem_fila);
+                if (colocar(&MQ, tarefa, tarefa.max_tempo) == false) {
+                    sem_post(shared_memory->sem_fila);
+                    snprintf(temp, BUFSIZE, "[SCHEDULER]: A lista de tarefas esta cheia, tarefa %d ignorada", tarefa.idTarefa);
                     log_msg(temp, 0);
-
-                    // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
-                    // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
-                    // sem_wait(shared_memory->sem_fila);
-                    // reoorganizar(&MQ, time(NULL));
-                    // sem_post(shared_memory->sem_fila);
+                    shared_memory->tarefas_descartadas++;
+                } else {
+                    sem_post(shared_memory->sem_fila);
+                    char temp[BUFSIZE];
                     sem_wait(shared_memory->sem_fila);
-                    if (colocar(&MQ, tarefa, tarefa.max_tempo) == false) {
-                        sem_post(shared_memory->sem_fila);
-                        snprintf(temp, BUFSIZE, "[SCHEDULER]: A lista de tarefas esta cheia, tarefa %d ignorada", tarefa.idTarefa);
-                        log_msg(temp, 0);
-                        shared_memory->tarefas_descartadas++;
-                    } else {
-                        sem_post(shared_memory->sem_fila);
-                        char temp[BUFSIZE];
-                        sem_wait(shared_memory->sem_fila);
-                        tarefa.tempo_chegada = time(NULL);
-                        MQ.n_tarefas++;
-                        shared_memory->n_tarefas++;
-                        pthread_cond_signal(&shared_memory->cond_monitor);
-                        snprintf(temp, BUFSIZE, "[SCHEDULER]: Tarefa inserida na fila nº %d", MQ.n_tarefas);
-                        sem_post(shared_memory->sem_fila);
-                        pthread_cond_signal(&shared_memory->cond_dispatcher);
-                        log_msg(temp, 0);
-                    }
+                    tarefa.tempo_chegada = time(NULL);
+                    MQ.n_tarefas++;
+                    shared_memory->n_tarefas++;
+                    pthread_cond_signal(&shared_memory->cond_monitor);
+                    snprintf(temp, BUFSIZE, "[SCHEDULER]: Tarefa inserida na fila nº %d", MQ.n_tarefas);
+                    sem_post(shared_memory->sem_fila);
+                    pthread_cond_signal(&shared_memory->cond_dispatcher);
+                    log_msg(temp, 0);
                 }
-                kappa++;
             }
+            kappa++;
             token = strtok(NULL, ";");
         }
 
