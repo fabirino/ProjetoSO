@@ -96,7 +96,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                     sem_wait(shared_memory->sem_fila);
                     printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
                     sem_post(shared_memory->sem_fila);
-                    // if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) || (received_msg.num_instrucoes / servers[i].mips2 < received_msg.max_tempo)) {
+                    if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) || (received_msg.num_instrucoes / servers[i].mips2 < received_msg.max_tempo)) {
                     int tempo_espera = time(NULL) - received_msg.tempo_chegada;
                     shared_memory->tempo_medio += tempo_espera;
                     if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
@@ -108,7 +108,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                     sem_post(shared_memory->sem_fila);
                     possivel = 1;
                     break;
-                    //}
+                    }
                 } else {
                     sem_post(shared_memory->sem_manutencao);
                     continue;
@@ -125,7 +125,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             sem_post(shared_memory->sem_servers);
             log_msg(mensagem, 0);
         }
-        sleep(1); // DEBUG: desbugar a vm necessita deste sleep ns pq
+        sleep(0.2); // DEBUG: desbugar a vm necessita deste sleep ns pq
     }
 
     pthread_exit(NULL);
