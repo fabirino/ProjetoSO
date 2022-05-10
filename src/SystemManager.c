@@ -73,10 +73,6 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    // Catch signals by main process
-    signal(SIGTSTP, SIGTSTP_HANDLER);
-    signal(SIGINT, SIGINT_HANDLER);
-
     log_msg("O TASK_PIPE iniciou", 0);
     // #=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -85,20 +81,24 @@ int main(int argc, char *argv[]) {
         erro("Erro ao criar a Message Queue");
     }
 
+    // Ignore Signals in this process
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGINT, SIG_IGN);
+
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
         log_msg("O processo Monitor comecou", 0);
 
-        // Ignore Signals in this process
-        signal(SIGTSTP, SIG_IGN);
-        signal(SIGINT, SIG_IGN);
+        // // Ignore Signals in this process
+        // signal(SIGTSTP, SIG_IGN);
+        // signal(SIGINT, SIG_IGN);
 
         while (1) { // TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
 
             sem_wait(shared_memory->sem_SM);
             sem_wait(shared_memory->sem_performace);
             pthread_mutex_lock(&shared_memory->mutex_monitor);
-            while (((shared_memory->mode_cpu == 1) && (shared_memory->n_tarefas < shared_memory->QUEUE_POS * 0.8 /*&& tempo < shared_memory->MAX_WAIT*/)) ||  ((shared_memory->mode_cpu == 2) && (shared_memory->n_tarefas > shared_memory->QUEUE_POS * 0.2))) {
+            while (((shared_memory->mode_cpu == 1) && (shared_memory->n_tarefas < shared_memory->QUEUE_POS * 0.8 /*&& tempo < shared_memory->MAX_WAIT*/)) || ((shared_memory->mode_cpu == 2) && (shared_memory->n_tarefas > shared_memory->QUEUE_POS * 0.2))) {
                 sem_post(shared_memory->sem_performace);
                 sem_post(shared_memory->sem_SM);
                 pthread_cond_wait(&shared_memory->cond_monitor, &shared_memory->mutex_monitor);
@@ -146,22 +146,19 @@ int main(int argc, char *argv[]) {
     // Maintenance Manager =================================================================
     if ((shared_memory->maintenance_pid = fork()) == 0) {
         log_msg("O processo Maintenance Manager comecou", 0);
-        
-        // Ignore Signals in this process
-        signal(SIGTSTP, SIG_IGN);
-        signal(SIGINT, SIG_IGN);
+
+        // // Ignore Signals in this process
+        // signal(SIGTSTP, SIG_IGN);
+        // signal(SIGINT, SIG_IGN);
         sleep(5);
 
-        while (1) { // BUG: QUANDO COLOCA-SE ESTE WHILE FICA TODO LAGADO A VM!!!!!!! RESORVER NS COMO
-            // TODO: MM tera de mandar uma msg pela MQ para entrar em STOPPED
-            // como e que o edge server responde ao MM??????????
+        while (1) { // FIXME: AGR ISTO FAZ VARIAS VEZES!
 
-            time_t t; // FIXME: so gera os 2 primeiros, ver depois esta parte!!
-            srand((unsigned)time(&t));
+            srand(time(NULL));
 
             int tempo = rand() % 5 + 1;
 
-            sleep(tempo);
+            // sleep(tempo);
 
             int servidor;
 
@@ -180,27 +177,35 @@ int main(int argc, char *argv[]) {
             if (existe && count <= shared_memory->EDGE_SERVER_NUMBER && count > 1) {
                 // Escolher um servidor para entrar em manutencao
                 servidor = array[rand() % count];
-                servers[servidor].em_manutencao = 1;
+
+                sem_wait(shared_memory->sem_manutencao);
+                servers[servidor].manutencao = 1;
+                sem_post(shared_memory->sem_manutencao);
 
                 // detalhes da mensagem
                 priority_msg my_msg;
-                my_msg.priority = servidor;
+                my_msg.priority = servidor + 1;
                 my_msg.temp_man = tempo;
                 msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
-                printf("DEBUG: manutencao server n_[%d]\n", servidor+1);
+                printf("DEBUG: manutencao server n_[%d]\n", servidor + 1);
 
-                // tempo = rand() % 5 + 1;
-
-                // sleep(tempo);
+                tempo = rand() % 4 + 1;
+                sleep(tempo);
 
                 // msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
 
                 servers[servidor].manutencoes += 1;
             }
+            sleep(1);
         }
 
         exit(0);
     }
+
+        // Catch signals by main process
+    signal(SIGTSTP, SIGTSTP_HANDLER);
+    signal(SIGINT, SIGINT_HANDLER);
+
 
     while (wait(NULL) > 0)
         ;

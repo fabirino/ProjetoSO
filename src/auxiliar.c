@@ -254,6 +254,7 @@ void createEdgeServers(char *path) {
             servers[i].cpu_ativo[l] = 0;
         }
         servers[i].em_manutencao = 0;
+        servers[i].manutencao = 0;
 
         // considerar o vcpu1 o menos eficaz
         if (servers[i].mips2 > servers[i].mips1) {

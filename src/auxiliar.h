@@ -88,6 +88,7 @@ typedef struct {
     pthread_mutex_t mutex; // Semaforo altera o numero de vCPUs em uso i.e alterna entre Normal e HP
 
     int em_manutencao; // Modo Stopped
+    int manutencao;
     int tarefas_executadas;
     int manutencoes;
 
