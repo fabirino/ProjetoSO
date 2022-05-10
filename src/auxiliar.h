@@ -34,7 +34,7 @@ typedef struct {
     int idTarefa;
     int num_instrucoes;
     int max_tempo;
-    time_t tempo_chegada;
+    struct tm tempo_chegada;
 } Task;
 
 typedef struct {

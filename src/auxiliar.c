@@ -18,26 +18,26 @@ void reoorganizar(base *pf, time_t tempo) { // Insertion Sort (Geeks for Geeks)
     // Acho que nao precisamos de reorganizar pq nos inserimos na lista logo por ordem
 
     // int i, key, j;
-    for (int i = 0; i < shared_memory->QUEUE_POS; i++) {
-        if (pf->nos->ocupado == true) {
-            time_t t = tempo - pf->nos[i].tarefa.tempo_chegada;
-            pf->nos[i].tarefa.max_tempo -= t;
-            if (pf->nos[i].tarefa.max_tempo <= 0) {
-                char mensagem[200];
-                snprintf(mensagem, 200, "[SCHEDULER]: Tempo insuficiente para executar a tarefa %d", pf->nos[i].tarefa.idTarefa);
-                pf->nos[i].ocupado = false;
-                pf->n_tarefas--;
-                shared_memory->n_tarefas--;
+    // for (int i = 0; i < shared_memory->QUEUE_POS; i++) {
+    //     if (pf->nos->ocupado == true) {
+    //         time_t t = tempo - pf->nos[i].tarefa.tempo_chegada;
+    //         pf->nos[i].tarefa.max_tempo -= t;
+    //         if (pf->nos[i].tarefa.max_tempo <= 0) {
+    //             char mensagem[200];
+    //             snprintf(mensagem, 200, "[SCHEDULER]: Tempo insuficiente para executar a tarefa %d", pf->nos[i].tarefa.idTarefa);
+    //             pf->nos[i].ocupado = false;
+    //             pf->n_tarefas--;
+    //             shared_memory->n_tarefas--;
 
-                log_msg(mensagem, 0);
-            } else {
-                if (pf->nos[i].tarefa.max_tempo < 1)
-                    pf->nos[i].prioridade = 1;
-                else
-                    pf->nos[i].prioridade = (int)pf->nos[i].tarefa.max_tempo;
-            }
-        }
-    }
+    //             log_msg(mensagem, 0);
+    //         } else {
+    //             if (pf->nos[i].tarefa.max_tempo < 1)
+    //                 pf->nos[i].prioridade = 1;
+    //             else
+    //                 pf->nos[i].prioridade = (int)pf->nos[i].tarefa.max_tempo;
+    //         }
+    //     }
+    // }
 
     // // DEBUG: esta mal por causa da mens_seguinte muito provavelmente
     // printf("\n\n mostrar array ordenado: ");
@@ -323,10 +323,6 @@ void SIGINT_HANDLER(int signum) {
     sem_unlink("SEM_PERFORMACE");
     sem_unlink("SEM_FILA");
 
-    kill(shared_memory->maintenance_pid, SIGKILL);
-    kill(shared_memory->monitor_pid, SIGKILL);
-    kill(shared_memory->TM_pid, SIGKILL);
-
     // Close pipes
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         close(servers[i].fd[READ]);
@@ -336,6 +332,12 @@ void SIGINT_HANDLER(int signum) {
     // Remove shared_memory
     shmdt(shared_memory);
     shmctl(shmid, IPC_RMID, NULL);
+    shmdt(servers);
+    shmctl(shmserversid, IPC_RMID, NULL);
+
+    kill(shared_memory->maintenance_pid, SIGKILL);
+    kill(shared_memory->monitor_pid, SIGKILL);
+    kill(shared_memory->TM_pid, SIGKILL);
 
     log_msg("O programa terminou\n", 0);
     // FIXME: sempre que ha um kill() o programa acaba imediatamente
