@@ -84,6 +84,8 @@ int main(int argc, char *argv[]) {
     // Ignore Signals in this process
     signal(SIGTSTP, SIG_IGN);
     signal(SIGINT, SIG_IGN);
+    signal(SIGHUP, SIG_IGN);    // Hung up the process
+    signal(SIGQUIT, SIG_IGN);   // Quit the process
 
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
@@ -202,7 +204,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-        // Catch signals by main process
+    // Catch signals by main process
     signal(SIGTSTP, SIGTSTP_HANDLER);
     signal(SIGINT, SIGINT_HANDLER);
 

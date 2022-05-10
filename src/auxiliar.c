@@ -268,7 +268,9 @@ void createEdgeServers(char *path) {
 // Funcao que trata do CTRL-Z (imprime as estatisticas)
 void SIGTSTP_HANDLER(int signum) {
 
-    printf("\n------Estatisticas------\n");
+    printf("\n");
+    log_msg("Sinal SIGTSTP recebido", 0);
+    printf("------Estatisticas------\n");
 
     // Total de tarefas executadas
     int count = 0;

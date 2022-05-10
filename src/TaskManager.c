@@ -297,7 +297,7 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
         int teste = 0;
 
         // Verificar os sinais do echo
-        if (strlen(mensagem) <= 6) { // para nao confundir com as tarefas
+        if (strlen(mensagem) <= 8) { // para nao confundir com as tarefas EXIT-5 STATS-6
             mensagem[strlen(mensagem) - 1] = '\0';
             if (!strcmp(mensagem, "EXIT")) { // echo "EXIT" > TASK_PIPE
                 // Acaba o programa
@@ -305,6 +305,10 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
             } else if (!strcmp(mensagem, "STATS")) { // echo "STATS" > TASK_PIPE
                 // Imprime as estatisticas
                 SIGTSTP_HANDLER(1);
+            } else{
+                char temp[BUFSIZE];
+                snprintf(mensagem, BUFSIZE, "Comando errado => %s", mensagem);
+                log_msg(temp, 0);
             }
         }
 
