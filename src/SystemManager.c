@@ -14,10 +14,12 @@ int main(int argc, char *argv[]) {
         erro("Parametros errados. Exemplo:\noffload_simulator <config_file>\n");
     }
 
-    // Create shared memory
-    shmid = shmget(IPC_PRIVATE, sizeof(SM), IPC_CREAT | 0766);
-    // Attach shared memory
-    shared_memory = (SM *)shmat(shmid, NULL, 0);
+    // Read config file
+    char path[20];
+    strcpy(path, argv[1]);
+
+    config(path);
+
 
     // Inicializar semaforos;
     sem_unlink("SEM_MANUTENCAO");
@@ -54,17 +56,9 @@ int main(int argc, char *argv[]) {
 
     log_msg("O programa iniciou", 1);
 
-    // Read config file
-    char path[20];
-    strcpy(path, argv[1]);
-
-    config(path);
     shared_memory->Num_es_ativos = 0;
 
-    shmserversid = shmget(IPC_PRIVATE, sizeof(sizeof(Edge_Server) * shared_memory->EDGE_SERVER_NUMBER), IPC_CREAT | 0766);
-
-    // Attach shared memory
-    servers = (Edge_Server *)shmat(shmserversid, NULL, 0);
+    
     createEdgeServers(path);
 
     // cria o named pipe se ainda nao existe

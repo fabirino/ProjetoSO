@@ -11,39 +11,17 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
     Task received_msg; // DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!!
 
     while (1) {
-        int count = 0;
-        sem_wait(shared_memory->sem_SM);
-        for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-            if (servers[i].em_manutencao == 0) {
-                if (servers[i].cpu_ativo[0] == 0)
-                    count++;
-                if (servers[i].cpu_ativo[1] == 0)
-                    count++;
-            }
-        }
-        sem_post(shared_memory->sem_SM);
 
         // Verificar os ES que estao livres
         sem_wait(shared_memory->sem_SM);
         sem_wait(shared_memory->sem_performace);
         sem_wait(shared_memory->sem_fila);
         pthread_mutex_lock(&shared_memory->mutex_dispatcher);
-        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (count <= 0))) {
-            printf("DEBUG: while, %d | %d | %d | %d | count: %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, count, shared_memory->n_tarefas);
+        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (shared_memory->Num_es_ativos == (shared_memory->EDGE_SERVER_NUMBER * 2)))) {
             sem_post(shared_memory->sem_performace);
             sem_post(shared_memory->sem_SM);
             sem_post(shared_memory->sem_fila);
             pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
-            sem_wait(shared_memory->sem_SM);
-            for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-                if (servers[i].em_manutencao == 0) {
-                    if (servers[i].cpu_ativo[0] == 0)
-                        count++;
-                    if (servers[i].cpu_ativo[1] == 0)
-                        count++;
-                }
-            }
-            sem_post(shared_memory->sem_SM);
         }
         retirar(&MQ, &received_msg);
         sem_post(shared_memory->sem_performace);
@@ -75,9 +53,17 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                         time_t tempo_final;
                         time(&tempo_final);
                         double tempo_espera = difftime(mktime(localtime(&tempo_final)), mktime(&received_msg.tempo_chegada));
-                        printf("tempo espera!! -> %f\n", tempo_espera);
-                        // sem_wait(shared_memory->sem_estatisticas);
-                        shared_memory->tempo_medio += tempo_espera;
+                        sem_wait(shared_memory->sem_fila);
+                        printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
+                        if (MQ.n_tarefas <= 1 || tempo_espera > 1000000)
+                            sem_post(shared_memory->sem_fila);
+                        else {
+                            sem_post(shared_memory->sem_fila);
+                            sem_wait(shared_memory->sem_SM);
+                            shared_memory->tempo_medio += tempo_espera;
+                            sem_post(shared_memory->sem_SM);
+                            printf("tempo espera!! -> %f\n", tempo_espera);
+                        }
                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
                             perror("Erro ao escrever no pipe:");
                         }
@@ -97,16 +83,22 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                 if (servers[i].em_manutencao == 0 && servers[i].es_ativo < 2) {
                     sem_post(shared_memory->sem_manutencao);
                     sem_post(shared_memory->sem_SM);
-                    sem_wait(shared_memory->sem_fila);
-                    printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
-                    sem_post(shared_memory->sem_fila);
-                    if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) || (received_msg.num_instrucoes / servers[i].mips2 < received_msg.max_tempo)) {
+                    if (received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) {
                         time_t tempo_final;
                         time(&tempo_final);
                         double tempo_espera = difftime(mktime(localtime(&tempo_final)), mktime(&received_msg.tempo_chegada));
-                        printf("tempo espera!! -> %f\n", tempo_espera);
+                        sem_wait(shared_memory->sem_fila);
+                        printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
+                        if (MQ.n_tarefas <= 1 || tempo_espera > 1000000)
+                            sem_post(shared_memory->sem_fila);
+                        else {
+                            sem_post(shared_memory->sem_fila);
+                            sem_wait(shared_memory->sem_SM);
+                            shared_memory->tempo_medio += tempo_espera;
+                            sem_post(shared_memory->sem_SM);
+                            printf("tempo espera!! -> %f\n", tempo_espera);
+                        }
                         // sem_wait(shared_memory->sem_estatisticas);
-                        shared_memory->tempo_medio += tempo_espera;
                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
                             perror("Erro ao escrever no pipe:");
                         }
@@ -166,10 +158,6 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
         if (msgrcv(MQid, &MQ_msg, sizeof(priority_msg), i + 1, IPC_NOWAIT) != -1) {
             printf("DEBUG: ENTREI EM MANUTENCAO, ESPERANDO SERVER ACABAR TAREFA! %d \n", i + 1);
 
-            sem_wait(shared_memory->sem_manutencao);
-            servers[i].em_manutencao = 1;
-            sem_post(shared_memory->sem_manutencao);
-
             pthread_mutex_lock(&shared_memory->mutex_manutencao);
             while (servers[i].es_ativo > 0) {
                 printf("[SERVER_%d] espera while pthread_cond\n", i + 1);
@@ -178,16 +166,27 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             pthread_mutex_unlock(&shared_memory->mutex_manutencao);
             sem_wait(shared_memory->sem_performace);
 
-            sem_post(shared_memory->sem_performace);
-            sem_wait(shared_memory->sem_SM);
+            if (shared_memory->mode_cpu == 1) { // Modo Normal
+                sem_post(shared_memory->sem_performace);
+                sem_wait(shared_memory->sem_SM);
+                shared_memory->Num_es_ativos++;
+                servers[i].es_ativo++;
+                sem_post(shared_memory->sem_SM);
+                sem_post(shared_memory->sem_servers);
+            } else { // Modo HP
+                sem_post(shared_memory->sem_performace);
+                sem_wait(shared_memory->sem_SM);
+                shared_memory->Num_es_ativos += 2;
+                servers[i].es_ativo = 2;
+                servers[i].cpu_ativo[0] = 1;
+                servers[i].cpu_ativo[1] = 1;
+                sem_post(shared_memory->sem_SM);
+                sem_post(shared_memory->sem_servers);
+            }
 
-            shared_memory->Num_es_ativos += 2;
-            servers[i].es_ativo = 2;
-            servers[i].cpu_ativo[0] = 1;
-            servers[i].cpu_ativo[1] = 1;
-
-            sem_post(shared_memory->sem_SM);
-            sem_post(shared_memory->sem_servers);
+            sem_wait(shared_memory->sem_manutencao);
+            servers[i].em_manutencao = 1;
+            sem_post(shared_memory->sem_manutencao);
 
             memset(mensagem, 0, 200);
             snprintf(mensagem, 200, "O SERVER_%d vai entrar em manutencao", i + 1);
@@ -201,21 +200,25 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             log_msg(mensagem, 0);
             sem_wait(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
 
-            // TODO: secalhar aqui podemos aproveitar o codigo comum aos dois e meter antes
-            sem_post(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
-            sem_wait(shared_memory->sem_SM);
-            servers[i].es_ativo = 0;
-
-            shared_memory->Num_es_ativos -= 2;
-            servers[i].cpu_ativo[0] = 0;
-            servers[i].cpu_ativo[1] = 0;
-
-            sem_post(shared_memory->sem_SM);
-            sem_wait(shared_memory->sem_manutencao);
+            if (shared_memory->mode_cpu == 1) {
+                sem_post(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
+                sem_wait(shared_memory->sem_SM);
+                servers[i].es_ativo = 0;
+                shared_memory->Num_es_ativos--;
+                sem_post(shared_memory->sem_SM);
+            } else {
+                sem_post(shared_memory->sem_performace);
+                sem_wait(shared_memory->sem_SM);
+                servers[i].es_ativo = 0;
+                servers[i].cpu_ativo[0] = 0;
+                servers[i].cpu_ativo[1] = 0;
+                shared_memory->Num_es_ativos -= 2;
+                sem_post(shared_memory->sem_SM);
+            }
             servers[i].em_manutencao = 0;
-            servers[i].manutencao = 0;
-            sem_post(shared_memory->sem_manutencao);
+            pthread_mutex_lock(&shared_memory->mutex_dispatcher);
             pthread_cond_signal(&shared_memory->cond_dispatcher);
+            pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
         }
 
         // Recebe as tarefas enviadas pelo dispatcher

@@ -141,7 +141,6 @@ pthread_mutexattr_t mattr;
 pthread_condattr_t cattr;
 
 int shmid;
-int shmserversid;
 
 void erro(char *msg);
 
@@ -164,3 +163,150 @@ void server(int i);
 void *vCPU_routine(void *t);
 
 #endif
+
+// void *p_dispatcher(void *lista) { // distribuição das tarefas
+
+//     Task received_msg; // DEBUG:apenas testes!!!! IR PARA OS EDGE SERVERS !!!
+
+//     while (1) {
+//         int count = 0;
+//         sem_wait(shared_memory->sem_SM);
+//         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+//             if (servers[i].em_manutencao == 0) {
+//                 if (servers[i].cpu_ativo[0] == 0)
+//                     count++;
+//                 if (servers[i].cpu_ativo[1] == 0)
+//                     count++;
+//             }
+//         }
+//         sem_post(shared_memory->sem_SM);
+
+//         // Verificar os ES que estao livres
+//         sem_wait(shared_memory->sem_SM);
+//         sem_wait(shared_memory->sem_performace);
+//         sem_wait(shared_memory->sem_fila);
+//         pthread_mutex_lock(&shared_memory->mutex_dispatcher);
+//         while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (count <= 0))) {
+//             printf("DEBUG: while, %d | %d | %d | %d | count: %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, count, shared_memory->n_tarefas);
+//             sem_post(shared_memory->sem_performace);
+//             sem_post(shared_memory->sem_SM);
+//             sem_post(shared_memory->sem_fila);
+//             pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
+//             sem_wait(shared_memory->sem_SM);
+//             for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+//                 if (servers[i].em_manutencao == 0) {
+//                     if (servers[i].cpu_ativo[0] == 0)
+//                         count++;
+//                     if (servers[i].cpu_ativo[1] == 0)
+//                         count++;
+//                 }
+//             }
+//             sem_post(shared_memory->sem_SM);
+//         }
+//         retirar(&MQ, &received_msg);
+//         sem_post(shared_memory->sem_performace);
+//         sem_post(shared_memory->sem_SM);
+//         sem_post(shared_memory->sem_fila);
+//         pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+
+//         sem_wait(shared_memory->sem_servers);
+
+//         char temp[BUFSIZE];
+//         int possivel = 0;
+
+//         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+//             if (possivel == 1)
+//                 break;
+//             sem_wait(shared_memory->sem_performace);
+//             if (shared_memory->mode_cpu == 1) { // Modo Normal
+//                 sem_post(shared_memory->sem_performace);
+
+//                 sem_wait(shared_memory->sem_SM);
+//                 if (servers[i].es_ativo == 0) {
+//                     sem_post(shared_memory->sem_SM);
+//                     sem_wait(shared_memory->sem_fila);
+//                     printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
+//                     sem_post(shared_memory->sem_fila);
+//                     // TODO:
+
+//                     if (received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) { // FIXME: verficar esta condicao
+//                         time_t tempo_final;
+//                         time(&tempo_final);
+//                         double tempo_espera = difftime(mktime(localtime(&tempo_final)), mktime(&received_msg.tempo_chegada));
+//                         sem_wait(shared_memory->sem_fila);
+//                         printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
+//                         if (MQ.n_tarefas <= 1|| tempo_espera > 1000000)
+//                             sem_post(shared_memory->sem_fila);
+//                         else {
+//                             sem_post(shared_memory->sem_fila);
+//                             sem_wait(shared_memory->sem_SM);
+//                             shared_memory->tempo_medio += tempo_espera;
+//                             sem_post(shared_memory->sem_SM);
+//                             printf("tempo espera!! -> %f\n", tempo_espera);
+//                         }
+//                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
+//                             perror("Erro ao escrever no pipe:");
+//                         }
+//                         sem_wait(shared_memory->sem_fila);
+//                         shared_memory->n_tarefas--;
+//                         pthread_cond_signal(&shared_memory->cond_monitor);
+//                         sem_post(shared_memory->sem_fila);
+//                         possivel = 1;
+//                         break;
+//                     }
+//                 }
+
+//             } else if (shared_memory->mode_cpu == 2) { // Modo HP //FIXME: BUGADO ATE AO PESCOÇO, MAS JA ESTEVE MAIS!!
+//                 sem_post(shared_memory->sem_performace);
+//                 sem_wait(shared_memory->sem_SM);
+//                 sem_wait(shared_memory->sem_manutencao);
+//                 if (servers[i].em_manutencao == 0 && servers[i].es_ativo < 2) {
+//                     sem_post(shared_memory->sem_manutencao);
+//                     sem_post(shared_memory->sem_SM);
+//                     if ((received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) || (received_msg.num_instrucoes / servers[i].mips2 < received_msg.max_tempo)) {
+//                         time_t tempo_final;
+//                         time(&tempo_final);
+//                         double tempo_espera = difftime(mktime(localtime(&tempo_final)), mktime(&received_msg.tempo_chegada));
+//                         sem_wait(shared_memory->sem_fila);
+//                         printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
+//                         if (MQ.n_tarefas <= 1 || tempo_espera > 1000000)
+//                             sem_post(shared_memory->sem_fila);
+//                         else {
+//                             sem_post(shared_memory->sem_fila);
+//                             sem_wait(shared_memory->sem_SM);
+//                             shared_memory->tempo_medio += tempo_espera;
+//                             sem_post(shared_memory->sem_SM);
+//                             printf("tempo espera!! -> %f\n", tempo_espera);
+//                         }
+//                         // sem_wait(shared_memory->sem_estatisticas);
+//                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
+//                             perror("Erro ao escrever no pipe:");
+//                         }
+//                         sem_wait(shared_memory->sem_fila);
+//                         shared_memory->n_tarefas--;
+//                         pthread_cond_signal(&shared_memory->cond_monitor);
+//                         sem_post(shared_memory->sem_fila);
+//                         possivel = 1;
+//                         break;
+//                     }
+//                 } else {
+//                     sem_post(shared_memory->sem_manutencao);
+//                     continue;
+//                 }
+//             }
+//         }
+//         if (possivel == 0) {
+//             char mensagem[200];
+//             snprintf(mensagem, 200, "Tempo insuficiente para executar a tarefa %d", received_msg.idTarefa);
+//             sem_wait(shared_memory->sem_fila);
+//             shared_memory->n_tarefas--;
+//             pthread_cond_signal(&shared_memory->cond_monitor);
+//             sem_post(shared_memory->sem_fila);
+//             sem_post(shared_memory->sem_servers);
+//             log_msg(mensagem, 0);
+//         }
+//         sleep(0.4); // DEBUG: desbugar a vm necessita deste sleep ns pq
+//     }
+
+//     pthread_exit(NULL);
+// }

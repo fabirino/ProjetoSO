@@ -229,21 +229,35 @@ void config(char *path) {
     FILE *fich = fopen(path, "r");
     assert(fich);
 
+    int q_pos = 0;
+    int max = 0;
+    int n_servers = 0;
+
     char line[20];
 
     fscanf(fich, "%s", line);
-    shared_memory->QUEUE_POS = atoi(line);
+    q_pos = atoi(line);
 
     fscanf(fich, "%s", line);
-    shared_memory->MAX_WAIT = atoi(line);
+    max = atoi(line);
 
     fscanf(fich, "%s", line);
-    shared_memory->EDGE_SERVER_NUMBER = atoi(line);
-    if (shared_memory->EDGE_SERVER_NUMBER < 2) {
+    n_servers = atoi(line);
+    if (n_servers < 2) {
         log_msg("Numero insuficiente de Edge Servers(>=2)!!", 1);
         exit(0);
     }
     fclose(fich);
+
+    // Create shared memory
+    shmid = shmget(IPC_PRIVATE, sizeof(SM) + sizeof(Edge_Server) * n_servers, IPC_CREAT | 0766);
+    // Attach shared memory
+    shared_memory = (SM *)shmat(shmid, NULL, 0);
+    servers = (Edge_Server *)(shared_memory + 1);
+
+    shared_memory->QUEUE_POS =q_pos;
+    shared_memory->MAX_WAIT = max;
+    shared_memory->EDGE_SERVER_NUMBER = n_servers;
 
     // Inicializar variaveis da SM
     shared_memory->mode_cpu = 1;
@@ -329,7 +343,9 @@ void SIGTSTP_HANDLER(int signum) {
     printf("Total de tarefas executadas: %d\n", count);
 
     // Tempo medio de cada tarefa
+    sem_wait(shared_memory->sem_SM);
     float tempo_medio = (float)shared_memory->tempo_medio / (float)count;
+    sem_post(shared_memory->sem_SM);
     printf("Tempo medio de espera das Tarefas: %4fs\n", tempo_medio);
 
     // Numero de tarefas executadas por cada E Server
@@ -383,14 +399,14 @@ void SIGINT_HANDLER(int signum) {
     // if (shmdt(shared_memory)== -1){
     //       perror("acoplamento impossivel") ;
     //  }
-    //shmctl(shmid, IPC_RMID, NULL);
+    // if ( shmctl(shmid, IPC_RMID,0) == -1){
+    //       perror("destruicao impossivel") ;
+    //  }
 
     kill(shared_memory->maintenance_pid, SIGKILL);
     kill(shared_memory->monitor_pid, SIGKILL);
     kill(shared_memory->TM_pid, SIGKILL);
 
-    shmdt(servers);
-    shmctl(shmserversid, IPC_RMID, NULL);
 
     log_msg("O programa terminou\n", 0);
     // FIXME: sempre que ha um kill() o programa acaba imediatamente
