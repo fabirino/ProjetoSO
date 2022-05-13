@@ -22,6 +22,9 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             sem_post(shared_memory->sem_SM);
             sem_post(shared_memory->sem_fila);
             pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
+            // sem_wait(shared_memory->sem_SM);
+            // sem_wait(shared_memory->sem_performace);
+            // sem_wait(shared_memory->sem_fila);
         }
         retirar(&MQ, &received_msg);
         sem_post(shared_memory->sem_performace);
@@ -32,11 +35,9 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
         sem_wait(shared_memory->sem_servers);
 
         char temp[BUFSIZE];
-        int possivel = 0;
+        bool possivel = false;
 
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-            if (possivel == 1)
-                break;
             sem_wait(shared_memory->sem_performace);
             if (shared_memory->mode_cpu == 1) { // Modo Normal
                 sem_post(shared_memory->sem_performace);
@@ -71,7 +72,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                         shared_memory->n_tarefas--;
                         pthread_cond_signal(&shared_memory->cond_monitor);
                         sem_post(shared_memory->sem_fila);
-                        possivel = 1;
+                        possivel = true;
                         break;
                     }
                 }
@@ -106,16 +107,18 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                         shared_memory->n_tarefas--;
                         pthread_cond_signal(&shared_memory->cond_monitor);
                         sem_post(shared_memory->sem_fila);
-                        possivel = 1;
+                        possivel = true;
                         break;
                     }
                 } else {
                     sem_post(shared_memory->sem_manutencao);
                     continue;
                 }
+            }else{
+                sem_post(shared_memory->sem_performace);
             }
         }
-        if (possivel == 0) {
+        if (possivel == false) {
             char mensagem[200];
             snprintf(mensagem, 200, "Tempo insuficiente para executar a tarefa %d", received_msg.idTarefa);
             sem_wait(shared_memory->sem_fila);
