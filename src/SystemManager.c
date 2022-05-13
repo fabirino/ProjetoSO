@@ -20,7 +20,6 @@ int main(int argc, char *argv[]) {
 
     config(path);
 
-
     // Inicializar semaforos;
     sem_unlink("SEM_MANUTENCAO");
     sem_unlink("SEM_TAREFAS");
@@ -51,6 +50,9 @@ int main(int argc, char *argv[]) {
     pthread_mutex_init(&shared_memory->mutex_manutencao, &mattr);
     pthread_cond_init(&shared_memory->cond_manutencao, &cattr);
 
+    pthread_mutex_init(&shared_memory->mutex_maintenance, &mattr);
+    pthread_cond_init(&shared_memory->cond_maintenance, &cattr);
+
     pthread_mutex_init(&shared_memory->mutex_monitor, &mattr);
     pthread_cond_init(&shared_memory->cond_monitor, &cattr);
 
@@ -58,7 +60,6 @@ int main(int argc, char *argv[]) {
 
     shared_memory->Num_es_ativos = 0;
 
-    
     createEdgeServers(path);
 
     // cria o named pipe se ainda nao existe
@@ -78,8 +79,8 @@ int main(int argc, char *argv[]) {
     // Ignore Signals in this process
     signal(SIGTSTP, SIG_IGN);
     signal(SIGINT, SIG_IGN);
-    signal(SIGHUP, SIG_IGN);    // Hung up the process
-    signal(SIGQUIT, SIG_IGN);   // Quit the process
+    signal(SIGHUP, SIG_IGN);  // Hung up the process
+    signal(SIGQUIT, SIG_IGN); // Quit the process
 
     // Monitor =============================================================================
     if ((shared_memory->monitor_pid = fork()) == 0) {
@@ -98,6 +99,8 @@ int main(int argc, char *argv[]) {
                 sem_post(shared_memory->sem_performace);
                 sem_post(shared_memory->sem_SM);
                 pthread_cond_wait(&shared_memory->cond_monitor, &shared_memory->mutex_monitor);
+                sem_wait(shared_memory->sem_SM);
+                sem_wait(shared_memory->sem_performace);
             }
             sem_post(shared_memory->sem_performace);
             sem_post(shared_memory->sem_SM);
@@ -162,6 +165,16 @@ int main(int argc, char *argv[]) {
             int existe = 0;
             int array[shared_memory->EDGE_SERVER_NUMBER];
 
+            sem_wait(shared_memory->sem_manutencao);
+            pthread_mutex_lock(&shared_memory->mutex_maintenance);
+            while (shared_memory->em_manutencao >= (shared_memory->EDGE_SERVER_NUMBER - 1)) {
+                sem_post(shared_memory->sem_manutencao);
+                pthread_cond_wait(&shared_memory->cond_maintenance, &shared_memory->mutex_maintenance);
+                sem_wait(shared_memory->sem_manutencao);
+            }
+            sem_post(shared_memory->sem_manutencao);
+            pthread_mutex_unlock(&shared_memory->mutex_maintenance);
+
             // criar um array so com os ES que nao estao em manutencao no momento
             for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
                 if (servers[i].manutencao == 0) {
@@ -176,6 +189,7 @@ int main(int argc, char *argv[]) {
 
                 sem_wait(shared_memory->sem_manutencao);
                 servers[servidor].manutencao = 1;
+                shared_memory->em_manutencao++;
                 sem_post(shared_memory->sem_manutencao);
 
                 // detalhes da mensagem
@@ -201,7 +215,6 @@ int main(int argc, char *argv[]) {
     // Catch signals by main process
     signal(SIGTSTP, SIGTSTP_HANDLER);
     signal(SIGINT, SIGINT_HANDLER);
-
 
     while (wait(NULL) > 0)
         ;

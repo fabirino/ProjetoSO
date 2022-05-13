@@ -106,6 +106,7 @@ typedef struct shared_memory {
 
     int n_tarefas;
     int tempo_medio;
+    int em_manutencao;
 
     pid_t TM_pid;
     pid_t monitor_pid;
@@ -116,15 +117,17 @@ typedef struct shared_memory {
     sem_t *sem_ficheiro;   // Semaforo para escrever no ficheiro log
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
     sem_t *sem_servers;    // Semaforo para esperar para que
-    sem_t *sem_performace; // 
-    sem_t *sem_fila; // 
+    sem_t *sem_performace; //
+    sem_t *sem_fila;       //
 
     pthread_mutex_t mutex_dispatcher; // semaforo para as threads
     pthread_cond_t cond_dispatcher;   // variavel de condicao que muda de Normal para HP
-    pthread_mutex_t mutex_manutencao; 
-    pthread_cond_t cond_manutencao; 
-    pthread_mutex_t mutex_monitor; 
-    pthread_cond_t cond_monitor;     
+    pthread_mutex_t mutex_manutencao;
+    pthread_cond_t cond_manutencao;
+    pthread_mutex_t mutex_monitor;
+    pthread_cond_t cond_monitor;
+    pthread_mutex_t mutex_maintenance;
+    pthread_cond_t cond_maintenance;
 
     int Num_es_ativos; // numero de edge servers ativos!!
 

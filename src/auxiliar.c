@@ -161,11 +161,9 @@ bool retirar(base *pf, Task *ptarefa) {
     if (j != -1)
         // havia mais do que uma mensagem na lista
         pf->nos[j].mens_seguinte = -1;
-    sem_wait(shared_memory->sem_fila);
     pf->nos[i].ocupado = false;
     *ptarefa = pf->nos[i].tarefa;
     pf->n_tarefas--;
-    sem_post(shared_memory->sem_fila);
     return true;
 }
 
@@ -264,6 +262,7 @@ void config(char *path) {
     shared_memory->Num_es_ativos = 0;
     shared_memory->n_tarefas = 0;
     shared_memory->tempo_medio = 0;
+    shared_memory->em_manutencao = 0;
 }
 
 // funcao que cria os edge servers com base nos dados obtidos no ficheiro config
@@ -343,9 +342,9 @@ void SIGTSTP_HANDLER(int signum) {
     printf("Total de tarefas executadas: %d\n", count);
 
     // Tempo medio de cada tarefa
-    sem_wait(shared_memory->sem_SM);
+
     float tempo_medio = (float)shared_memory->tempo_medio / (float)count;
-    sem_post(shared_memory->sem_SM);
+
     printf("Tempo medio de espera das Tarefas: %4fs\n", tempo_medio);
 
     // Numero de tarefas executadas por cada E Server
@@ -360,6 +359,20 @@ void SIGTSTP_HANDLER(int signum) {
 
     // Num de tarefas nao executadas
     printf("Numero de tarefas nao executadas: %d\n", shared_memory->tarefas_descartadas);
+
+    int value;
+    sem_getvalue(shared_memory->sem_fila, &value);
+    printf("fila-> %d, ", value);
+    sem_getvalue(shared_memory->sem_manutencao, &value);
+    printf("manutencao -> %d , ", value);
+    sem_getvalue(shared_memory->sem_SM, &value);
+    printf("sm-> %d, ", value);
+    sem_getvalue(shared_memory->sem_servers, &value);
+    printf("servers->%d, ", value);
+    sem_getvalue(shared_memory->sem_tarefas, &value);
+    printf("tarefas ->%d, ", value);
+    sem_getvalue(shared_memory->sem_performace, &value);
+    printf("performace -> %d\n", value);
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
