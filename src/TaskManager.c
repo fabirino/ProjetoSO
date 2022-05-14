@@ -4,7 +4,7 @@
 #include "auxiliar.h"
 
 // criar a message queue interna a la maneta !!
-base MQ;
+base lista_tarefas;
 
 void *p_dispatcher(void *lista) { // distribuição das tarefas
 
@@ -18,7 +18,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
         sem_wait(shared_memory->sem_fila);
         sem_wait(shared_memory->sem_manutencao);
         pthread_mutex_lock(&shared_memory->mutex_dispatcher);
-        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (shared_memory->Num_es_ativos >= (shared_memory->EDGE_SERVER_NUMBER * 2 - shared_memory->em_manutencao*2)))) {
+        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (shared_memory->Num_es_ativos >= (shared_memory->EDGE_SERVER_NUMBER * 2 - shared_memory->em_manutencao * 2)))) {
             sem_post(shared_memory->sem_performace);
             sem_post(shared_memory->sem_SM);
             sem_post(shared_memory->sem_fila);
@@ -29,17 +29,48 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             sem_wait(shared_memory->sem_fila);
             sem_wait(shared_memory->sem_manutencao);
         }
-        retirar(&MQ, &received_msg);
+        if (!retirar(&lista_tarefas, &received_msg)) {
+            sem_post(shared_memory->sem_performace);
+            sem_post(shared_memory->sem_SM);
+            sem_post(shared_memory->sem_fila);
+            sem_post(shared_memory->sem_manutencao);
+            continue;
+        }
+
         sem_post(shared_memory->sem_performace);
         sem_post(shared_memory->sem_SM);
         sem_post(shared_memory->sem_fila);
         sem_post(shared_memory->sem_manutencao);
         pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
 
+        struct timeval s_time;
+        gettimeofday(&s_time, NULL);
+
+        float inter = (float)(s_time.tv_sec - received_msg.tempo_chegada.tv_sec);
+        inter += (s_time.tv_usec - received_msg.tempo_chegada.tv_usec) * 1e-6;
+        float max = received_msg.max_tempo - inter;
+
+        if (inter < 1000000) {
+            if (max <= 0) { // Retirar as mensagens cujo tempo de execucao ja expirou
+                char mensagem[BUFSIZE];
+                memset(mensagem, 0, BUFSIZE);
+                snprintf(mensagem, BUFSIZE, "[DISPATCHER] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada ||%f!", received_msg.idTarefa, max);
+                log_msg(mensagem, 0);
+                sem_wait(shared_memory->sem_fila);
+                lista_tarefas.n_tarefas--;
+                shared_memory->n_tarefas--;
+                shared_memory->tarefas_descartadas++;
+                sem_post(shared_memory->sem_fila);
+                continue;
+            } else { // Diminuir os tempos de execucao
+                received_msg.max_tempo = max;
+            }
+        }
+
         char temp[BUFSIZE];
         bool possivel = false;
 
-        //sem_wait(shared_memory->sem_servers);
+        // sem_wait(shared_memory->sem_servers);
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             sem_wait(shared_memory->sem_performace);
             if (shared_memory->mode_cpu == 1) { // Modo Normal
@@ -54,12 +85,14 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                     // TODO:
 
                     if (received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) { // FIXME: verficar esta condicao
-                        time_t tempo_final;
-                        time(&tempo_final);
-                        double tempo_espera = difftime(mktime(localtime(&tempo_final)), mktime(&received_msg.tempo_chegada));
+                        struct timeval stop_time;
+                        gettimeofday(&stop_time, NULL);
+                        float tempo_espera = (float)(stop_time.tv_sec - received_msg.tempo_chegada.tv_sec);
+                        tempo_espera += (stop_time.tv_usec - received_msg.tempo_chegada.tv_usec) * 1e-6;
+                        printf("tempo_espera ->%f\n", tempo_espera);
                         sem_wait(shared_memory->sem_fila);
                         printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
-                        if (MQ.n_tarefas <= 1 || tempo_espera > 1000000)
+                        if (lista_tarefas.n_tarefas <= 1 || tempo_espera > 1000000)
                             sem_post(shared_memory->sem_fila);
                         else {
                             sem_post(shared_memory->sem_fila);
@@ -78,7 +111,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                         possivel = true;
                         break;
                     }
-                }else{
+                } else {
                     sem_post(shared_memory->sem_SM);
                 }
 
@@ -90,19 +123,20 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                     sem_post(shared_memory->sem_manutencao);
                     sem_post(shared_memory->sem_SM);
                     if (received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) {
-                        time_t tempo_final;
-                        time(&tempo_final);
-                        double tempo_espera = difftime(mktime(localtime(&tempo_final)), mktime(&received_msg.tempo_chegada));
+                        struct timeval stop_time;
+                        gettimeofday(&stop_time, NULL);
+                        float tempo_espera = (float)(stop_time.tv_sec - received_msg.tempo_chegada.tv_sec);
+                        tempo_espera += (stop_time.tv_usec - received_msg.tempo_chegada.tv_usec) * 1e-6;
+                        printf("tempo_espera ->%f\n", tempo_espera);
                         sem_wait(shared_memory->sem_fila);
                         printf("DEBUG: passou while, %d | %d | %d | %d | n_tarefas: %d\n", shared_memory->Num_es_ativos, servers[0].es_ativo, servers[1].es_ativo, servers[2].es_ativo, shared_memory->n_tarefas);
-                        if (MQ.n_tarefas <= 1 || tempo_espera > 1000000)
+                        if (lista_tarefas.n_tarefas <= 1 || tempo_espera > 1000000)
                             sem_post(shared_memory->sem_fila);
                         else {
                             sem_post(shared_memory->sem_fila);
                             sem_wait(shared_memory->sem_SM);
                             shared_memory->tempo_medio += tempo_espera;
                             sem_post(shared_memory->sem_SM);
-                            printf("tempo espera!! -> %f\n", tempo_espera);
                         }
                         // sem_wait(shared_memory->sem_estatisticas);
                         if (write(servers[i].fd[WRITE], &received_msg, sizeof(Task)) == -1) {
@@ -119,18 +153,18 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
                     sem_post(shared_memory->sem_manutencao);
                     sem_post(shared_memory->sem_SM);
                 }
-            }else{
+            } else {
                 sem_post(shared_memory->sem_performace);
             }
         }
         if (possivel == false) {
             char mensagem[200];
-            snprintf(mensagem, 200, "Tempo insuficiente para executar a tarefa %d", received_msg.idTarefa);
+            snprintf(mensagem, 200, "Tempo insuficiente para executar a tarefa %d , max_temp = %f", received_msg.idTarefa, received_msg.max_tempo);
             sem_wait(shared_memory->sem_fila);
             shared_memory->n_tarefas--;
             pthread_cond_signal(&shared_memory->cond_monitor);
             sem_post(shared_memory->sem_fila);
-            //sem_post(shared_memory->sem_servers);
+            // sem_post(shared_memory->sem_servers);
             log_msg(mensagem, 0);
         }
         sleep(0.4); // DEBUG: desbugar a vm necessita deste sleep ns pq
@@ -180,7 +214,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
                 shared_memory->Num_es_ativos++;
                 servers[i].es_ativo++;
                 sem_post(shared_memory->sem_SM);
-                //sem_post(shared_memory->sem_servers);
+                // sem_post(shared_memory->sem_servers);
             } else { // Modo HP
                 sem_post(shared_memory->sem_performace);
                 sem_wait(shared_memory->sem_SM);
@@ -224,7 +258,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
                 sem_post(shared_memory->sem_SM);
             }
             sem_wait(shared_memory->sem_manutencao);
-            shared_memory->em_manutencao --;
+            shared_memory->em_manutencao--;
             servers[i].em_manutencao = 0;
             sem_post(shared_memory->sem_manutencao);
             pthread_mutex_lock(&shared_memory->mutex_dispatcher);
@@ -239,7 +273,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             perror("Erro ao ler do pipe");
             continue;
         } else {
-            printf("[SERVER_%d]  reveived, Task_id: %d number of requests: %d , max time: %d\n",
+            printf("[SERVER_%d]  reveived, Task_id: %d number of requests: %d , max time: %lf\n",
                    i + 1, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
         }
 
@@ -321,8 +355,8 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                 // Imprime as estatisticas
                 SIGTSTP_HANDLER(1);
             } else {
-                char temp[BUFSIZE];
-                snprintf(mensagem, BUFSIZE, "Comando errado => %s", mensagem);
+                char temp[BUFSIZE * 2];
+                snprintf(temp, BUFSIZE * 2, "Comando errado => %s", mensagem);
                 log_msg(temp, 0);
             }
         }
@@ -335,29 +369,25 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                 tarefa.num_instrucoes = atoi(token);
             else {
                 tarefa.max_tempo = atoi(token);
-                snprintf(temp, BUFSIZE, "[SCHEDULER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %d",
+                snprintf(temp, BUFSIZE, "[SCHEDULER] Read %d bytes: reveived, Task_id: %d number of requests: %d , max time: %lf",
                          r, tarefa.idTarefa, tarefa.num_instrucoes, tarefa.max_tempo);
                 log_msg(temp, 0);
 
                 // TODO:  colocar a tarefa, tem que reorganizar a fila, ou seja, diminuir a prioridade e verificar se ainda
                 // tem tempo para executar as tarefas, diminuir a prioridade o tempo que ja passou desde a ultima vez que colocou!!
-                // sem_wait(shared_memory->sem_fila);
-                // reoorganizar(&MQ, time(NULL));
-                // sem_post(shared_memory->sem_fila);
                 sem_wait(shared_memory->sem_fila);
-                if (colocar(&MQ, tarefa, tarefa.max_tempo) == false) {
+                reoorganizar(&lista_tarefas);
+                if (colocar(&lista_tarefas, tarefa) == false) {
                     sem_post(shared_memory->sem_fila);
                     snprintf(temp, BUFSIZE, "[SCHEDULER]: A lista de tarefas esta cheia, tarefa %d ignorada", tarefa.idTarefa);
                     log_msg(temp, 0);
                     shared_memory->tarefas_descartadas++;
                 } else {
                     char temp[BUFSIZE];
-                    time_t tempo;
-                    time(&tempo);
-                    tarefa.tempo_chegada = *localtime(&tempo);
-                    MQ.n_tarefas++;
+                    gettimeofday(&tarefa.tempo_chegada, NULL);
+                    lista_tarefas.n_tarefas++;
                     shared_memory->n_tarefas++;
-                    snprintf(temp, BUFSIZE, "[SCHEDULER]: Tarefa inserida na fila nº %d", MQ.n_tarefas);
+                    snprintf(temp, BUFSIZE, "[SCHEDULER]: Tarefa inserida na fila nº %d", lista_tarefas.n_tarefas);
                     sem_post(shared_memory->sem_fila);
                     pthread_cond_signal(&shared_memory->cond_monitor);
                     pthread_cond_signal(&shared_memory->cond_dispatcher);
@@ -382,7 +412,7 @@ void task_manager() {
         }
     }
 
-    inicializar(&MQ);
+    inicializar(&lista_tarefas);
 
     // Criar um processo para cada Edge Server
     char teste[100];

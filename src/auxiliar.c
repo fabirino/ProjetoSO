@@ -6,164 +6,170 @@
 /* Funcoes da lista ligada*/
 
 void inicializar(base *pf) {
-    pf->nos = (no_fila *)malloc(sizeof(no_fila) * shared_memory->QUEUE_POS);
+    pf->first_node = NULL;
     pf->n_tarefas = 0;
-    // a fila está inicialmente vazia
-    pf->entrada_lista = shared_memory->QUEUE_POS - 1;
-    for (int i = 0; i < shared_memory->QUEUE_POS; i++)
-        pf->nos[i].ocupado = false;
 }
 
-void reoorganizar(base *pf, struct timeval tempo) { // Insertion Sort (Geeks for Geeks)
-                                                    // Acho que nao precisamos de reorganizar pq nos inserimos na lista logo por ordem
+void reoorganizar(base *pf) {
 
-    // int i, key, j;
-    // if (pf->entrada_lista = -1) {
-    //     return;
-    // } else {
+    struct timeval stop_time;
+    gettimeofday(&stop_time, NULL);
 
-    //     char mens[BUFSIZE];
-    //     int primeira = 0;
-    //     while (primeira == 0) {
-    //         long double intervalo = (long double)(tempo.tv_usec - pf->nos[pf->entrada_lista].tarefa.tempo_chegada.tv_usec) / 1000000 + (long double)(tempo.tv_sec - pf->nos[pf->entrada_lista].tarefa.tempo_chegada.tv_sec);
-    //         if (intervalo < 1000000) {
-    //             if (intervalo <= 0) {
-    //                 memset(mens, 0, BUFSIZE);
-    //                 snprintf(mens, 0, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada!", pf->nos[pf->entrada_lista].tarefa.idTarefa);
-    //                 pf->nos[pf->entrada_lista].ocupado = false;
-    //                 pf->n_tarefas--;
-    //                 shared_memory->n_tarefas--;
-    //                 if (pf->nos[pf->entrada_lista].mens_seguinte != -1)
-    //                     pf->entrada_lista = pf->nos[pf->entrada_lista].mens_seguinte;
-    //                 else {
-    //                     pf->entrada_lista = -1;
-    //                     primeira = 1;
-    //                 }
+    no_fila *aux = pf->first_node;
+    no_fila *anterior = NULL;
+    char mensagem[BUFSIZE];
 
-    //                 log_msg(mens, 0);
-    //             } else {
-    //                 pf->nos[pf->entrada_lista].tarefa.max_tempo = intervalo;
-    //                 if (intervalo <= 1) {
-    //                     pf->nos[pf->entrada_lista].prioridade = 1;
-    //                 } else {
-    //                     pf->nos[pf->entrada_lista].prioridade = (int)pf->nos[pf->entrada_lista].tarefa.max_tempo;
-    //                 }
-    //                 primeira = 1;
-    //             }
-    //         } else {
-    //             primeira = 1;
-    //         }
-    //     }
-    //     if (pf->entrada_lista != -1) {
+    while (aux != NULL) {
+        float intervalo = (float)(stop_time.tv_sec - aux->tarefa.tempo_chegada.tv_sec);
+        intervalo += (stop_time.tv_usec - aux->tarefa.tempo_chegada.tv_usec) * 1e-6;
+        float max = aux->tarefa.max_tempo - intervalo;
 
-    //         int prox = pf->entrada_lista;
+        if (intervalo < 1000000) {
+            if (max <= 0) { // Retirar as mensagens cujo tempo de execucao ja expirou
 
-    //         while (pf->nos[prox].mens_seguinte != -1) {
-    //             long double intervalo = (long double)(tempo.tv_usec - pf->nos[pf->nos[prox].mens_seguinte].tarefa.tempo_chegada.tv_usec) / 1000000 + (long double)(tempo.tv_sec - pf->nos[pf->nos[prox].mens_seguinte].tarefa.tempo_chegada.tv_sec);
-    //             if (intervalo < 1000000) {
-    //                 if (intervalo <= 0) {
-    //                     memset(mens, 0, BUFSIZE);
-    //                     snprintf(mens, 0, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada!", pf->nos[pf->nos[prox].mens_seguinte].tarefa.idTarefa);
-    //                     pf->nos[pf->nos[prox].mens_seguinte].ocupado = false;
-    //                     pf->n_tarefas--;
-    //                     shared_memory->n_tarefas--;
-    //                     if (pf->nos[pf->nos[prox].mens_seguinte].mens_seguinte != -1) {
-    //                         pf->nos[prox].mens_seguinte = pf->nos[pf->nos[prox].mens_seguinte].mens_seguinte;
-    //                     } else {
-    //                         pf->nos[prox].mens_seguinte = -1;
-    //                         break;
-    //                     }
-    //                     log_msg(mens, 0);
-    //                 } else {
-    //                     pf->nos[pf->entrada_lista].tarefa.max_tempo = intervalo;
-    //                     if (intervalo <= 1) {
-    //                         pf->nos[pf->entrada_lista].prioridade = 1;
-    //                     } else {
-    //                         pf->nos[pf->entrada_lista].prioridade = (int)pf->nos[pf->entrada_lista].tarefa.max_tempo;
-    //                     }
-    //                 }
-    //             }
-    //             prox = pf->nos[prox].mens_seguinte;
-    //         }
-    //     }
-    // }
+                if (anterior == NULL) { // Primeiro no
+                    memset(mensagem, 0, BUFSIZE);
+                    snprintf(mensagem, BUFSIZE, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada ||%f!", aux->tarefa.idTarefa,max);
+                    log_msg(mensagem, 0);
+                    pf->n_tarefas--;
+                    shared_memory->n_tarefas--;
+                    shared_memory->tarefas_descartadas++;
 
-    // // DEBUG: esta mal por causa da mens_seguinte muito provavelmente
-    // printf("\n\n mostrar array ordenado: ");
-    // for (int a = 0; a < pf->n_tarefas; a++) {
-    //     printf("%d  ", pf->nos[a].prioridade);
-    // }
-    // printf("\n");
+                    pf->first_node = aux->next;
+                    free(aux);
+
+                } else { // Outros nos
+                    memset(mensagem, 0, BUFSIZE);
+                    snprintf(mensagem, BUFSIZE ,"[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada ||%f!", aux->tarefa.idTarefa,max);
+                    log_msg(mensagem, 0);
+                    pf->n_tarefas--;
+                    shared_memory->n_tarefas--;
+                    shared_memory->tarefas_descartadas++;
+
+                    anterior->next = aux->next;
+                    free(aux);
+                }
+
+            } else { // Diminuir os tempos de execucao
+                aux->tarefa.max_tempo = max;
+            }
+        }
+        anterior = aux;
+        aux = aux->next;
+    }
 }
 
-bool colocar(base *pf, Task tarefa, int prioridade) {
-    int i, anterior, prox;
-    // Procurar uma posição disponível
-    for (i = shared_memory->QUEUE_POS - 1; i >= 0 && pf->nos[i].ocupado; i--)
-        ;
-    if (i < 0) {
-        // fila cheia - não é possível inserir mais nada
+bool colocar(base *pf, Task tarefa) {
+
+    if (pf->n_tarefas >= 50) {
         return false;
     }
-    // colocar mensagem na fila
-    pf->nos[i].tarefa = tarefa;
-    pf->nos[i].prioridade = prioridade;
 
-    // Procurar a posição onde a mensagem deve ficar
-    if (!(pf->nos[pf->entrada_lista].ocupado)) {
-        // fila vazia, inserir primeira mensagem
-        pf->entrada_lista = i;
-        pf->nos[i].mens_seguinte = -1;
+    no_fila *newnode = (no_fila *)malloc(sizeof(no_fila));
+    newnode->tarefa.idTarefa = tarefa.idTarefa;
+    newnode->tarefa.num_instrucoes = tarefa.num_instrucoes;
+    newnode->tarefa.max_tempo = tarefa.max_tempo;
+    newnode->tarefa.tempo_chegada = tarefa.tempo_chegada;
+    newnode->next = NULL;
+    no_fila *aux = pf->first_node;
+    if (aux == NULL) { // Fila vazia
+        pf->first_node = newnode;
+    } else {
+        while ((aux->next != NULL)) {
+            aux = aux->next;
+        }
+        aux->next = newnode;
+    }
+
+    return true;
+
+    /*
+    // bool colocar(struct lista *pf, int numero[3], int prioridade) {
+    struct no_fila *aux, *prox, *anterior;
+
+    //Obter espaço para um novo nó
+    aux = (struct no_fila *) malloc(sizeof(struct no_fila));
+    if (aux == NULL)
+        //não há espaço
+        return false;
+
+    //construir novo nó da fila
+    for (int i = 0; i < 3; i++)
+        aux->num[i] = numero[i];
+    aux->prioridade = prioridade;
+    aux->pseg = NULL;
+
+    //Procurar a posição onde a mensagem deve ficar
+    if (pf->raiz == NULL) {
+        // fila vazia, é a primeira mensagem
+        pf->raiz = aux;
     } else {
         // fila contém mensagens
-        if (pf->nos[pf->entrada_lista].prioridade >= prioridade) {
+        if (pf->raiz->prioridade >= prioridade) {
             // inserir à entrada da lista
-            pf->nos[i].mens_seguinte = pf->entrada_lista;
-            pf->entrada_lista = i;
+            aux->pseg = pf->raiz;
+            pf->raiz = aux;
         } else {
             // procurar posição de inserção
-            anterior = pf->entrada_lista;
-            prox = pf->nos[pf->entrada_lista].mens_seguinte;
-            while (prox >= 0 && pf->nos[prox].prioridade < prioridade) {
+            anterior = pf->raiz;
+            prox = pf->raiz->pseg;
+            while (prox != NULL && prox->prioridade < prioridade) {
                 anterior = prox;
-                prox = pf->nos[prox].mens_seguinte;
+                prox = prox->pseg;
             }
-            if (prox < 0) {
-                // inserir nos final da lista
-                pf->nos[anterior].mens_seguinte = i;
-                pf->nos[i].mens_seguinte = -1;
+            if (prox == NULL) {
+                // inserir à saída da lista
+                anterior->pseg = aux;
             } else {
                 // inserir a meio da lista
-                pf->nos[anterior].mens_seguinte = i;
-                pf->nos[i].mens_seguinte = prox;
+                anterior->pseg = aux;
+                aux->pseg = prox;
             }
         }
     }
-    pf->nos[i].ocupado = true;
-
-    // reoorganizar(pf, 0);
-
     return true;
+// }
+    */
 }
 
 bool retirar(base *pf, Task *ptarefa) {
-    int i, j;
-    if (!pf->nos[pf->entrada_lista].ocupado) {
-        // lista vazia
+
+    if (pf->first_node == NULL) {
         return false;
     }
 
-    //  Procurar a última mensagem da lista
-    j = -1;
-    for (i = pf->entrada_lista; pf->nos[i].mens_seguinte != -1; i = pf->nos[i].mens_seguinte)
-        j = i; // guardar a localização da mensagem anterior à que vai sair
+    no_fila *aux = pf->first_node;
+    no_fila *anterior = NULL;
 
-    if (j != -1)
-        // havia mais do que uma mensagem na lista
-        pf->nos[j].mens_seguinte = -1;
-    pf->nos[i].ocupado = false;
-    *ptarefa = pf->nos[i].tarefa;
-    pf->n_tarefas--;
+    float min_temp = aux->tarefa.max_tempo;
+    while ((aux->next != NULL)) {
+        if (min_temp > aux->tarefa.max_tempo) {
+            min_temp = aux->tarefa.max_tempo;
+        }
+        aux = aux->next;
+    }
+    aux = pf->first_node;
+    while (aux != NULL) {
+        if (anterior == NULL && aux->tarefa.max_tempo == min_temp) {
+            *ptarefa = aux->tarefa;
+            pf->n_tarefas--;
+            pf->first_node = aux->next;
+            free(aux);
+            break;
+        } else {
+            if (aux->tarefa.max_tempo == min_temp) {
+                *ptarefa = aux->tarefa;
+                printf("\n%f\n\n", ptarefa->max_tempo);
+                pf->n_tarefas--;
+                anterior->next = aux->next;
+                free(aux);
+                break;
+            }
+        }
+        anterior = aux;
+        aux = aux->next;
+    }
+    // printf("\ntempo_max -> %f\n\n", ptarefa->max_tempo);
     return true;
 }
 
@@ -253,7 +259,7 @@ void config(char *path) {
     shared_memory = (SM *)shmat(shmid, NULL, 0);
     servers = (Edge_Server *)(shared_memory + 1);
 
-    shared_memory->QUEUE_POS =q_pos;
+    shared_memory->QUEUE_POS = q_pos;
     shared_memory->MAX_WAIT = max;
     shared_memory->EDGE_SERVER_NUMBER = n_servers;
 
@@ -265,7 +271,7 @@ void config(char *path) {
     shared_memory->em_manutencao = 0;
 }
 
-// funcao que cria os edge servers com base nos dados obtidos no ficheiro config
+// funcao que cria os edge servers com base first_node dados obtidos no ficheiro config
 void createEdgeServers(char *path) {
 
     FILE *fich = fopen(path, "r");
@@ -369,8 +375,8 @@ void SIGTSTP_HANDLER(int signum) {
     printf("sm-> %d, ", value);
     sem_getvalue(shared_memory->sem_servers, &value);
     printf("servers->%d, ", value);
-    sem_getvalue(shared_memory->sem_tarefas, &value);
-    printf("tarefas ->%d, ", value);
+    // sem_getvalue(shared_memory->sem_tarefas, &value);
+    // printf("tarefas ->%d, ", value);
     sem_getvalue(shared_memory->sem_performace, &value);
     printf("performace -> %d\n", value);
 }
@@ -388,14 +394,14 @@ void SIGINT_HANDLER(int signum) {
 
     // Fechar os semaforos
     sem_close(shared_memory->sem_manutencao);
-    sem_close(shared_memory->sem_tarefas);
+    // sem_close(shared_memory->sem_tarefas);
     sem_close(shared_memory->sem_ficheiro);
     sem_close(shared_memory->sem_SM);
     sem_close(shared_memory->sem_servers);
     sem_close(shared_memory->sem_performace);
     sem_close(shared_memory->sem_fila);
     sem_unlink("SEM_MANUTENCAO");
-    sem_unlink("SEM_TAREFAS");
+    // sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
     sem_unlink("SEM_SM");
     sem_unlink("SEM_SERVERS");
@@ -419,7 +425,6 @@ void SIGINT_HANDLER(int signum) {
     kill(shared_memory->maintenance_pid, SIGKILL);
     kill(shared_memory->monitor_pid, SIGKILL);
     kill(shared_memory->TM_pid, SIGKILL);
-
 
     log_msg("O programa terminou\n", 0);
     // FIXME: sempre que ha um kill() o programa acaba imediatamente

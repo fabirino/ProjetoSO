@@ -30,14 +30,6 @@
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 typedef struct {
-    // dados
-    int idTarefa;
-    int num_instrucoes;
-    int max_tempo;
-    struct tm tempo_chegada;
-} Task;
-
-typedef struct {
     int ES_num;
     int mips_vcpu;
     int num_instrucoes;
@@ -47,25 +39,31 @@ typedef struct {
 } argumentos;
 
 typedef struct {
+    // dados
+    int idTarefa;
+    int num_instrucoes;
+    float max_tempo;
+    struct timeval tempo_chegada;
+} Task;
+
+typedef struct no_fila{
     Task tarefa;
-    bool ocupado;
-    int prioridade;
-    int mens_seguinte;
+    struct no_fila *next;
 } no_fila;
 
-typedef struct {
-    no_fila *nos;
+typedef struct base {
+    no_fila *first_node;
     int n_tarefas;
-    int entrada_lista;
+    // int entrada_lista;
 } base;
 
-bool colocar(base *pf, Task tarefa, int prioridade);
+bool colocar(base *pf, Task tarefa);
 
 bool retirar(base *pf, Task *ptarefa);
 
 void inicializar(base *pf);
 
-void reoorganizar(base *pf, struct timeval tempo);
+void reoorganizar(base *pf);
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -113,12 +111,12 @@ typedef struct shared_memory {
     pid_t maintenance_pid;
 
     sem_t *sem_manutencao; // Semaforo usado para parar os Edge Servers
-    sem_t *sem_tarefas;    // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
+    sem_t *sem_fila;       // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
     sem_t *sem_ficheiro;   // Semaforo para escrever no ficheiro log
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
     sem_t *sem_servers;    // Semaforo para esperar para que
     sem_t *sem_performace; //
-    sem_t *sem_fila;       //
+    
 
     pthread_mutex_t mutex_dispatcher; // semaforo para as threads
     pthread_cond_t cond_dispatcher;   // variavel de condicao que muda de Normal para HP
