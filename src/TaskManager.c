@@ -118,9 +118,9 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             } else if (shared_memory->mode_cpu == 2) { // Modo HP //FIXME: BUGADO ATE AO PESCOÇO, MAS JA ESTEVE MAIS!!
                 sem_post(shared_memory->sem_performace);
                 sem_wait(shared_memory->sem_SM);
-                sem_wait(shared_memory->sem_manutencao);
-                if (servers[i].em_manutencao == 0 && servers[i].es_ativo < 2) {
-                    sem_post(shared_memory->sem_manutencao);
+
+                if (servers[i].es_ativo < 2) {
+
                     sem_post(shared_memory->sem_SM);
                     if (received_msg.num_instrucoes / servers[i].mips1 < received_msg.max_tempo) {
                         struct timeval stop_time;
@@ -197,7 +197,10 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
         // Verificar se o ES vai entrar em manutencao
         memset(mensagem, 0, 200);
         priority_msg MQ_msg;
-        if (msgrcv(MQid, &MQ_msg, sizeof(priority_msg), i + 1, IPC_NOWAIT) != -1) {
+
+        sem_wait(shared_memory->sem_performace);
+        if (msgrcv(MQid, &MQ_msg, sizeof(priority_msg), i + 1, IPC_NOWAIT) != -1 && shared_memory->mode_cpu == 1) {
+        sem_post(shared_memory->sem_performace);
             printf("DEBUG: ENTREI EM MANUTENCAO, ESPERANDO SERVER ACABAR TAREFA! %d \n", i + 1);
 
             pthread_mutex_lock(&shared_memory->mutex_manutencao);
@@ -208,23 +211,14 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             pthread_mutex_unlock(&shared_memory->mutex_manutencao);
             sem_wait(shared_memory->sem_performace);
 
-            if (shared_memory->mode_cpu == 1) { // Modo Normal
+
                 sem_post(shared_memory->sem_performace);
                 sem_wait(shared_memory->sem_SM);
                 shared_memory->Num_es_ativos++;
                 servers[i].es_ativo++;
                 sem_post(shared_memory->sem_SM);
                 // sem_post(shared_memory->sem_servers);
-            } else { // Modo HP
-                sem_post(shared_memory->sem_performace);
-                sem_wait(shared_memory->sem_SM);
-                shared_memory->Num_es_ativos += 2;
-                servers[i].es_ativo = 2;
-                servers[i].cpu_ativo[0] = 1;
-                servers[i].cpu_ativo[1] = 1;
-                sem_post(shared_memory->sem_SM);
-                // sem_post(shared_memory->sem_servers);
-            }
+            
 
             sem_wait(shared_memory->sem_manutencao);
             servers[i].em_manutencao = 1;
@@ -242,21 +236,13 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             log_msg(mensagem, 0);
             sem_wait(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
 
-            if (shared_memory->mode_cpu == 1) {
+           
                 sem_post(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
                 sem_wait(shared_memory->sem_SM);
                 servers[i].es_ativo = 0;
                 shared_memory->Num_es_ativos--;
                 sem_post(shared_memory->sem_SM);
-            } else {
-                sem_post(shared_memory->sem_performace);
-                sem_wait(shared_memory->sem_SM);
-                servers[i].es_ativo = 0;
-                servers[i].cpu_ativo[0] = 0;
-                servers[i].cpu_ativo[1] = 0;
-                shared_memory->Num_es_ativos -= 2;
-                sem_post(shared_memory->sem_SM);
-            }
+            
             sem_wait(shared_memory->sem_manutencao);
             shared_memory->em_manutencao--;
             servers[i].em_manutencao = 0;
@@ -265,6 +251,8 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             pthread_cond_signal(&shared_memory->cond_dispatcher);
             pthread_cond_signal(&shared_memory->cond_maintenance);
             pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+        }else{
+            sem_post(shared_memory->sem_performace);
         }
 
         // Recebe as tarefas enviadas pelo dispatcher

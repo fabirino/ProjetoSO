@@ -49,6 +49,7 @@ typedef struct {
 typedef struct no_fila{
     Task tarefa;
     struct no_fila *next;
+    int prioridade;
 } no_fila;
 
 typedef struct base {
@@ -105,6 +106,7 @@ typedef struct shared_memory {
     int n_tarefas;
     int tempo_medio;
     int em_manutencao;
+    int n_manutencoes_ativas;
 
     pid_t TM_pid;
     pid_t monitor_pid;

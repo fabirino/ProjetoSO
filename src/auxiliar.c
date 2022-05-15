@@ -29,7 +29,7 @@ void reoorganizar(base *pf) {
 
                 if (anterior == NULL) { // Primeiro no
                     memset(mensagem, 0, BUFSIZE);
-                    snprintf(mensagem, BUFSIZE, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada ||%f!", aux->tarefa.idTarefa,max);
+                    snprintf(mensagem, BUFSIZE, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada ||%f!", aux->tarefa.idTarefa, max);
                     log_msg(mensagem, 0);
                     pf->n_tarefas--;
                     shared_memory->n_tarefas--;
@@ -40,7 +40,7 @@ void reoorganizar(base *pf) {
 
                 } else { // Outros nos
                     memset(mensagem, 0, BUFSIZE);
-                    snprintf(mensagem, BUFSIZE ,"[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada ||%f!", aux->tarefa.idTarefa,max);
+                    snprintf(mensagem, BUFSIZE, "[SCHEDULAR] a tarefa com id %d foi descartada pois ja nao tem tempo para ser executada ||%f!", aux->tarefa.idTarefa, max);
                     log_msg(mensagem, 0);
                     pf->n_tarefas--;
                     shared_memory->n_tarefas--;
@@ -51,12 +51,13 @@ void reoorganizar(base *pf) {
                 }
 
             } else { // Diminuir os tempos de execucao
-                aux->tarefa.max_tempo = max;
+                aux->prioridade = (int) aux->tarefa.max_tempo - (int)intervalo;
             }
         }
         anterior = aux;
         aux = aux->next;
     }
+    printf("acabei de reorganizar!");
 }
 
 bool colocar(base *pf, Task tarefa) {
@@ -65,71 +66,68 @@ bool colocar(base *pf, Task tarefa) {
         return false;
     }
 
-    no_fila *newnode = (no_fila *)malloc(sizeof(no_fila));
-    newnode->tarefa.idTarefa = tarefa.idTarefa;
-    newnode->tarefa.num_instrucoes = tarefa.num_instrucoes;
-    newnode->tarefa.max_tempo = tarefa.max_tempo;
-    newnode->tarefa.tempo_chegada = tarefa.tempo_chegada;
-    newnode->next = NULL;
-    no_fila *aux = pf->first_node;
-    if (aux == NULL) { // Fila vazia
-        pf->first_node = newnode;
-    } else {
-        while ((aux->next != NULL)) {
-            aux = aux->next;
-        }
-        aux->next = newnode;
-    }
+    // no_fila *newnode = (no_fila *)malloc(sizeof(no_fila));
+    // newnode->tarefa.idTarefa = tarefa.idTarefa;
+    // newnode->tarefa.num_instrucoes = tarefa.num_instrucoes;
+    // newnode->tarefa.max_tempo = tarefa.max_tempo;
+    // newnode->tarefa.tempo_chegada = tarefa.tempo_chegada;
+    // newnode->next = NULL;
+    // no_fila *aux = pf->first_node;
+    // if (aux == NULL) { // Fila vazia
+    //     pf->first_node = newnode;
+    // } else {
+    //     while ((aux->next != NULL)) {
+    //         aux = aux->next;
+    //     }
+    //     aux->next = newnode;
+    // }
 
-    return true;
+    // return true;
 
-    /*
     // bool colocar(struct lista *pf, int numero[3], int prioridade) {
     struct no_fila *aux, *prox, *anterior;
 
-    //Obter espaço para um novo nó
-    aux = (struct no_fila *) malloc(sizeof(struct no_fila));
+    // Obter espaço para um novo nó
+    aux = (struct no_fila *)malloc(sizeof(struct no_fila));
     if (aux == NULL)
-        //não há espaço
+        // não há espaço
         return false;
 
-    //construir novo nó da fila
-    for (int i = 0; i < 3; i++)
-        aux->num[i] = numero[i];
-    aux->prioridade = prioridade;
-    aux->pseg = NULL;
+    aux->tarefa = tarefa;
+    aux->prioridade = (int)tarefa.max_tempo;
+    int prioridade = (int)tarefa.max_tempo;
+    aux->next = NULL;
 
-    //Procurar a posição onde a mensagem deve ficar
-    if (pf->raiz == NULL) {
+    // Procurar a posição onde a mensagem deve ficar
+    if (pf->first_node == NULL) {
         // fila vazia, é a primeira mensagem
-        pf->raiz = aux;
+        pf->first_node = aux;
     } else {
         // fila contém mensagens
-        if (pf->raiz->prioridade >= prioridade) {
+        if (pf->first_node->prioridade <= prioridade) {
             // inserir à entrada da lista
-            aux->pseg = pf->raiz;
-            pf->raiz = aux;
+            aux->next = pf->first_node;
+            pf->first_node = aux;
         } else {
             // procurar posição de inserção
-            anterior = pf->raiz;
-            prox = pf->raiz->pseg;
-            while (prox != NULL && prox->prioridade < prioridade) {
+            anterior = pf->first_node;
+            prox = pf->first_node->next;
+            while (prox != NULL && prox->prioridade > prioridade) {
                 anterior = prox;
-                prox = prox->pseg;
+                prox = prox->next;
             }
             if (prox == NULL) {
                 // inserir à saída da lista
-                anterior->pseg = aux;
+                anterior->next = aux;
             } else {
                 // inserir a meio da lista
-                anterior->pseg = aux;
-                aux->pseg = prox;
+                anterior->next = aux;
+                aux->next = prox;
             }
         }
     }
     return true;
-// }
-    */
+    // }
 }
 
 bool retirar(base *pf, Task *ptarefa) {
@@ -139,39 +137,17 @@ bool retirar(base *pf, Task *ptarefa) {
     }
 
     no_fila *aux = pf->first_node;
-    no_fila *anterior = NULL;
 
-    float min_temp = aux->tarefa.max_tempo;
-    while ((aux->next != NULL)) {
-        if (min_temp > aux->tarefa.max_tempo) {
-            min_temp = aux->tarefa.max_tempo;
-        }
-        aux = aux->next;
-    }
     aux = pf->first_node;
-    while (aux != NULL) {
-        if (anterior == NULL && aux->tarefa.max_tempo == min_temp) {
-            *ptarefa = aux->tarefa;
-            pf->n_tarefas--;
-            pf->first_node = aux->next;
-            free(aux);
-            break;
-        } else {
-            if (aux->tarefa.max_tempo == min_temp) {
-                *ptarefa = aux->tarefa;
-                printf("\n%f\n\n", ptarefa->max_tempo);
-                pf->n_tarefas--;
-                anterior->next = aux->next;
-                free(aux);
-                break;
-            }
-        }
-        anterior = aux;
-        aux = aux->next;
-    }
-    // printf("\ntempo_max -> %f\n\n", ptarefa->max_tempo);
+
+    *ptarefa = aux->tarefa;
+    pf->n_tarefas--;
+    pf->first_node = aux->next;
+    free(aux);
+
     return true;
 }
+
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
