@@ -17,8 +17,21 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
         sem_wait(shared_memory->sem_performace);
         sem_wait(shared_memory->sem_fila);
         sem_wait(shared_memory->sem_manutencao);
+        int count = 0;
+        for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+            if (servers[i].em_manutencao == 0) {
+
+                if (servers[i].cpu_ativo[0] == 0) {
+                    count++;
+                }
+                if (servers[i].cpu_ativo[1] == 0) {
+                    count++;
+                }
+            }
+        }
+
         pthread_mutex_lock(&shared_memory->mutex_dispatcher);
-        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (shared_memory->Num_es_ativos >= (shared_memory->EDGE_SERVER_NUMBER * 2 - shared_memory->em_manutencao * 2)))) {
+        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (count <= 0))) {
             sem_post(shared_memory->sem_performace);
             sem_post(shared_memory->sem_SM);
             sem_post(shared_memory->sem_fila);
@@ -28,6 +41,18 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             sem_wait(shared_memory->sem_performace);
             sem_wait(shared_memory->sem_fila);
             sem_wait(shared_memory->sem_manutencao);
+            count = 0;
+            for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+                if (servers[i].em_manutencao == 0) {
+
+                    if (servers[i].cpu_ativo[0] == 0) {
+                        count++;
+                    }
+                    if (servers[i].cpu_ativo[1] == 0) {
+                        count++;
+                    }
+                }
+            }
         }
         if (!retirar(&lista_tarefas, &received_msg)) {
             sem_post(shared_memory->sem_performace);
@@ -70,7 +95,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
         char temp[BUFSIZE];
         bool possivel = false;
 
-        // sem_wait(shared_memory->sem_servers);
+        sem_wait(shared_memory->sem_servers);
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             sem_wait(shared_memory->sem_performace);
             if (shared_memory->mode_cpu == 1) { // Modo Normal
@@ -164,7 +189,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
             shared_memory->n_tarefas--;
             pthread_cond_signal(&shared_memory->cond_monitor);
             sem_post(shared_memory->sem_fila);
-            // sem_post(shared_memory->sem_servers);
+            sem_post(shared_memory->sem_servers);
             log_msg(mensagem, 0);
         }
         sleep(0.4); // DEBUG: desbugar a vm necessita deste sleep ns pq
@@ -200,7 +225,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
 
         sem_wait(shared_memory->sem_performace);
         if (msgrcv(MQid, &MQ_msg, sizeof(priority_msg), i + 1, IPC_NOWAIT) != -1 && shared_memory->mode_cpu == 1) {
-        sem_post(shared_memory->sem_performace);
+            sem_post(shared_memory->sem_performace);
             printf("DEBUG: ENTREI EM MANUTENCAO, ESPERANDO SERVER ACABAR TAREFA! %d \n", i + 1);
 
             pthread_mutex_lock(&shared_memory->mutex_manutencao);
@@ -211,14 +236,12 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             pthread_mutex_unlock(&shared_memory->mutex_manutencao);
             sem_wait(shared_memory->sem_performace);
 
-
-                sem_post(shared_memory->sem_performace);
-                sem_wait(shared_memory->sem_SM);
-                shared_memory->Num_es_ativos++;
-                servers[i].es_ativo++;
-                sem_post(shared_memory->sem_SM);
-                // sem_post(shared_memory->sem_servers);
-            
+            sem_post(shared_memory->sem_performace);
+            sem_wait(shared_memory->sem_SM);
+            shared_memory->Num_es_ativos += 2;
+            servers[i].es_ativo = 2;
+            sem_post(shared_memory->sem_SM);
+            // sem_post(shared_memory->sem_servers);
 
             sem_wait(shared_memory->sem_manutencao);
             servers[i].em_manutencao = 1;
@@ -236,22 +259,22 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             log_msg(mensagem, 0);
             sem_wait(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
 
-           
-                sem_post(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
-                sem_wait(shared_memory->sem_SM);
-                servers[i].es_ativo = 0;
-                shared_memory->Num_es_ativos--;
-                sem_post(shared_memory->sem_SM);
-            
+            sem_post(shared_memory->sem_performace); // QUESTION: para que e que servem estes dois?
+            sem_wait(shared_memory->sem_SM);
+            servers[i].es_ativo = 0;
+            shared_memory->Num_es_ativos -= 2;
+            sem_post(shared_memory->sem_SM);
+
             sem_wait(shared_memory->sem_manutencao);
             shared_memory->em_manutencao--;
             servers[i].em_manutencao = 0;
+            servers[i].manutencao = 0;
             sem_post(shared_memory->sem_manutencao);
             pthread_mutex_lock(&shared_memory->mutex_dispatcher);
             pthread_cond_signal(&shared_memory->cond_dispatcher);
             pthread_cond_signal(&shared_memory->cond_maintenance);
             pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
-        }else{
+        } else {
             sem_post(shared_memory->sem_performace);
         }
 
@@ -282,7 +305,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             servers[i].es_ativo++;
             servers[i].cpu_ativo[aux->n_vcpu - 1] = 1;
             sem_post(shared_memory->sem_SM);
-            // sem_post(shared_memory->sem_servers);
+            sem_post(shared_memory->sem_servers);
 
             pthread_create(&servers[i].vCPU[aux->n_vcpu - 1], NULL, vCPU_routine, (void *)aux);
 
@@ -303,7 +326,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             servers[i].es_ativo++;
             servers[i].cpu_ativo[aux->n_vcpu - 1] = 1;
             sem_post(shared_memory->sem_SM);
-            // sem_post(shared_memory->sem_servers);
+            sem_post(shared_memory->sem_servers);
 
             pthread_create(&servers[i].vCPU[aux->n_vcpu - 1], NULL, vCPU_routine, (void *)aux);
         }
@@ -334,7 +357,7 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
         int teste = 0;
 
         // Verificar os sinais do echo
-        if (strlen(mensagem) <= 8) { // para nao confundir com as tarefas EXIT-5 STATS-6
+        if (strlen(mensagem) < 7) { // para nao confundir com as tarefas EXIT-5 STATS-6
             mensagem[strlen(mensagem) - 1] = '\0';
             if (!strcmp(mensagem, "EXIT")) { // echo "EXIT" > TASK_PIPE
                 // Acaba o programa
@@ -370,6 +393,7 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                     snprintf(temp, BUFSIZE, "[SCHEDULER]: A lista de tarefas esta cheia, tarefa %d ignorada", tarefa.idTarefa);
                     log_msg(temp, 0);
                     shared_memory->tarefas_descartadas++;
+                    break;
                 } else {
                     char temp[BUFSIZE];
                     gettimeofday(&tarefa.tempo_chegada, NULL);
@@ -380,6 +404,7 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                     pthread_cond_signal(&shared_memory->cond_monitor);
                     pthread_cond_signal(&shared_memory->cond_dispatcher);
                     log_msg(temp, 0);
+                    break;
                 }
             }
             kappa++;

@@ -57,7 +57,6 @@ void reoorganizar(base *pf) {
         anterior = aux;
         aux = aux->next;
     }
-    printf("acabei de reorganizar!");
 }
 
 bool colocar(base *pf, Task tarefa) {
@@ -66,25 +65,6 @@ bool colocar(base *pf, Task tarefa) {
         return false;
     }
 
-    // no_fila *newnode = (no_fila *)malloc(sizeof(no_fila));
-    // newnode->tarefa.idTarefa = tarefa.idTarefa;
-    // newnode->tarefa.num_instrucoes = tarefa.num_instrucoes;
-    // newnode->tarefa.max_tempo = tarefa.max_tempo;
-    // newnode->tarefa.tempo_chegada = tarefa.tempo_chegada;
-    // newnode->next = NULL;
-    // no_fila *aux = pf->first_node;
-    // if (aux == NULL) { // Fila vazia
-    //     pf->first_node = newnode;
-    // } else {
-    //     while ((aux->next != NULL)) {
-    //         aux = aux->next;
-    //     }
-    //     aux->next = newnode;
-    // }
-
-    // return true;
-
-    // bool colocar(struct lista *pf, int numero[3], int prioridade) {
     struct no_fila *aux, *prox, *anterior;
 
     // Obter espaço para um novo nó
@@ -127,7 +107,6 @@ bool colocar(base *pf, Task tarefa) {
         }
     }
     return true;
-    // }
 }
 
 bool retirar(base *pf, Task *ptarefa) {

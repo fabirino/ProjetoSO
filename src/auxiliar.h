@@ -18,6 +18,7 @@
 #include <sys/msg.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -46,7 +47,7 @@ typedef struct {
     struct timeval tempo_chegada;
 } Task;
 
-typedef struct no_fila{
+typedef struct no_fila {
     Task tarefa;
     struct no_fila *next;
     int prioridade;
@@ -118,7 +119,6 @@ typedef struct shared_memory {
     sem_t *sem_SM;         // Semaforo para ler e escrever da Shared Memory
     sem_t *sem_servers;    // Semaforo para esperar para que
     sem_t *sem_performace; //
-    
 
     pthread_mutex_t mutex_dispatcher; // semaforo para as threads
     pthread_cond_t cond_dispatcher;   // variavel de condicao que muda de Normal para HP
