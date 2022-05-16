@@ -452,19 +452,26 @@ void SIGINT_HANDLER(int signum) {
 
     // Fechar os semaforos
     sem_close(shared_memory->sem_manutencao);
-    // sem_close(shared_memory->sem_tarefas);
     sem_close(shared_memory->sem_ficheiro);
     sem_close(shared_memory->sem_SM);
     sem_close(shared_memory->sem_servers);
     sem_close(shared_memory->sem_performace);
     sem_close(shared_memory->sem_fila);
     sem_unlink("SEM_MANUTENCAO");
-    // sem_unlink("SEM_TAREFAS");
     sem_unlink("SEM_FICHEIRO");
     sem_unlink("SEM_SM");
     sem_unlink("SEM_SERVERS");
     sem_unlink("SEM_PERFORMACE");
     sem_unlink("SEM_FILA");
+
+    pthread_mutex_destroy(&shared_memory->mutex_dispatcher);
+    pthread_mutex_destroy(&shared_memory->mutex_exit);
+    pthread_mutex_destroy(&shared_memory->mutex_maintenance);
+    pthread_mutex_destroy(&shared_memory->mutex_manutencao);
+    pthread_mutex_destroy(&shared_memory->mutex_monitor);
+
+    pthread_mutexattr_destroy(&mattr);
+    pthread_condattr_destroy(&cattr);
 
     // Close pipes
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
@@ -479,6 +486,6 @@ void SIGINT_HANDLER(int signum) {
     if (shmctl(shmid, IPC_RMID, 0) == -1) {
         perror("destruicao impossivel");
     }
-    // log_msg("O programa terminou\n", 0);
+    
     exit(0);
 }
