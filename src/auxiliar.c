@@ -176,6 +176,36 @@ void log_msg(char *msg, int first_time) {
     sem_post(shared_memory->sem_ficheiro);
 }
 
+void log_lista_final(base *lista) {
+    char mensagem[BUFSIZE * 4];
+    time_now(mensagem);
+
+    if(lista->n_tarefas == 0){
+        strcat(mensagem, "Nao ficaram tarefas por fazer\n");
+    }else{
+        strcat(mensagem, "Tarefas que ficaram por fazer:\n");
+
+        Task tarefa;
+        char msg[200];
+        while (retirar(lista, &tarefa)) {
+            memset(msg, 0, 200);
+            snprintf(msg, 200, "\tID: %d; Tempo maximo de execucao: %lf\n", tarefa.idTarefa, tarefa.max_tempo);
+            strcat(mensagem, msg);
+        }
+        printf("%s\n", mensagem);
+        printf("O programa terminou\n");
+    }
+
+    FILE *log = fopen("log.txt", "a");
+    if (log == NULL) {
+        erro("Erro ao abrir o ficheiro");
+    }
+    fprintf(log, "%s", mensagem);
+    fprintf(log, "\n");
+    fprintf(log, "O programa terminou\n");
+    fclose(log);
+}
+
 void erro(char *msg) {
     perror(msg);
     log_msg("O programa terminou devido a um erro.", 0);
@@ -195,12 +225,24 @@ void config(char *path) {
 
     fscanf(fich, "%s", line);
     q_pos = atoi(line);
+    if (q_pos <= 0) {
+        printf("Parametro errado no config_file!\n");
+        exit(1);
+    }
 
     fscanf(fich, "%s", line);
     max = atoi(line);
+    if (max <= 0) {
+        printf("Parametro errado no config_file!\n");
+        exit(1);
+    }
 
     fscanf(fich, "%s", line);
     n_servers = atoi(line);
+    if (n_servers <= 0) {
+        printf("Parametro errado no config_file!\n");
+        exit(1);
+    }
     if (n_servers < 2) {
         log_msg("Numero insuficiente de Edge Servers(>=2)!!", 1);
         exit(0);
@@ -254,11 +296,19 @@ void createEdgeServers(char *path) {
                 else if (n == 1) {
                     int ret;
                     ret = (int)strtol(token, &ptr, 10);
+                    if (ret <= 0) {
+                        printf("Parametro errado no config_file!\n");
+                        exit(1);
+                    }
                     servers[i].mips1 = ret;
                     n++;
                 } else if (n == 2) {
                     int ret;
                     ret = (int)strtol(token, &ptr, 10);
+                    if (ret <= 0) {
+                        printf("Parametro errado no config_file!\n");
+                        exit(1);
+                    }
                     servers[i].mips2 = ret;
                     n++;
                 }
@@ -297,20 +347,22 @@ void *out() {
     pthread_mutex_unlock(&shared_memory->mutex_exit);
 
     if (pidd == shared_memory->TM_pid) {
-        printf("TASK Manager a Terminar!\n");
+        log_msg("TASK Manager a Terminar", 0);
         pthread_cancel(shared_memory->scheduler);
-        printf("Schedular a Terminar\n");
+        log_msg("Schedular a Terminar", 0);
         pthread_cancel(shared_memory->dispatcher);
-        printf("Dispatcher a Terminar\n");
+        log_msg("Dispatcher a Terminar", 0);
 
     } else if (pidd == shared_memory->monitor_pid) {
-        printf("Monitor a Terminar!\n");
+        log_msg("Monitor a Terminar", 0);
     } else if (pidd == shared_memory->maintenance_pid) {
-        printf("Maintenance a Terminar!\n");
+        log_msg("Maintenance a Terminar", 0);
     } else {
         for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
             if (pidd == servers[i].pid) {
-                printf("Server%d a Terminar!\n",i);
+                char mens[BUFSIZE];
+                snprintf(mens, BUFSIZE, "Server%d a Terminar!", i);
+                log_msg(mens, 0);
                 pthread_cancel(servers[i].vCPU[0]);
                 pthread_cancel(servers[i].vCPU[1]);
             }
@@ -352,19 +404,17 @@ void SIGTSTP_HANDLER(int signum) {
     // Num de tarefas nao executadas
     printf("Numero de tarefas nao executadas: %d\n", shared_memory->tarefas_descartadas);
 
-    int value;
-    sem_getvalue(shared_memory->sem_fila, &value);
-    printf("fila-> %d, ", value);
-    sem_getvalue(shared_memory->sem_manutencao, &value);
-    printf("manutencao -> %d , ", value);
-    sem_getvalue(shared_memory->sem_SM, &value);
-    printf("sm-> %d, ", value);
-    sem_getvalue(shared_memory->sem_servers, &value);
-    printf("servers->%d, ", value);
-    // sem_getvalue(shared_memory->sem_tarefas, &value);
-    // printf("tarefas ->%d, ", value);
-    sem_getvalue(shared_memory->sem_performace, &value);
-    printf("performace -> %d\n", value);
+    //int value;
+    //sem_getvalue(shared_memory->sem_fila, &value);
+    //printf("fila-> %d, ", value);
+    //sem_getvalue(shared_memory->sem_manutencao, &value);
+    //printf("manutencao -> %d , ", value);
+    //sem_getvalue(shared_memory->sem_SM, &value);
+    //printf("sm-> %d, ", value);
+    //sem_getvalue(shared_memory->sem_servers, &value);
+    //printf("servers->%d, ", value);
+    //sem_getvalue(shared_memory->sem_performace, &value);
+    //printf("performace -> %d\n", value);
 }
 
 // Funcao que trata do CTRL-C (termina o programa)
@@ -376,6 +426,7 @@ void SIGINT_HANDLER(int signum) {
     shared_memory->exit = 1;
     sem_post(shared_memory->sem_SM);
 
+    log_msg("Esperando as ultimas tarefas terminarem", 0);
     sem_wait(shared_memory->sem_SM);
     pthread_mutex_lock(&shared_memory->mutex_dispatcher);
     while (shared_memory->Num_es_ativos > 0) {
@@ -388,16 +439,15 @@ void SIGINT_HANDLER(int signum) {
     sem_post(shared_memory->sem_SM);
 
     pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
-    
 
-    log_msg("Esperando as ultimas tarefas terminarem", 0); // TODO:
+    
 
     pthread_cond_broadcast(&shared_memory->cond_exit);
 
     while (wait(NULL) > 0)
         ;
 
-    // TODO: terminar a MQ
+    // terminar a MQ
     msgctl(MQid, IPC_RMID, 0);
 
     // Fechar os semaforos
@@ -416,23 +466,19 @@ void SIGINT_HANDLER(int signum) {
     sem_unlink("SEM_PERFORMACE");
     sem_unlink("SEM_FILA");
 
-
     // Close pipes
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         close(servers[i].fd[READ]);
         close(servers[i].fd[WRITE]);
     }
 
-
     // Remove shared_memory
-    if (shmdt(shared_memory)== -1){
-          perror("acoplamento impossivel") ;
-     }
-    if ( shmctl(shmid, IPC_RMID,0) == -1){
-          perror("destruicao impossivel") ;
-     }
+    if (shmdt(shared_memory) == -1) {
+        perror("acoplamento impossivel");
+    }
+    if (shmctl(shmid, IPC_RMID, 0) == -1) {
+        perror("destruicao impossivel");
+    }
     // log_msg("O programa terminou\n", 0);
-    // FIXME: sempre que ha um kill() o programa acaba imediatamente
-    /* Guarantees that every process receives a SIGTERM , to kill them */
     exit(0);
 }

@@ -157,6 +157,8 @@ void time_now(char *string);
 
 void log_msg(char *msg, int first_time);
 
+void log_lista_final(base *lista);
+
 void config(char *path);
 
 void createEdgeServers(char *path);
