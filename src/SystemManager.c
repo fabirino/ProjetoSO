@@ -56,6 +56,10 @@ int main(int argc, char *argv[]) {
     pthread_mutex_init(&shared_memory->mutex_monitor, &mattr);
     pthread_cond_init(&shared_memory->cond_monitor, &cattr);
 
+    
+    pthread_mutex_init(&shared_memory->mutex_exit, &mattr);
+    pthread_cond_init(&shared_memory->cond_exit, &cattr);
+
     log_msg("O programa iniciou", 1);
 
     shared_memory->Num_es_ativos = 0;
@@ -82,13 +86,15 @@ int main(int argc, char *argv[]) {
     signal(SIGHUP, SIG_IGN);  // Hung up the process
     signal(SIGQUIT, SIG_IGN); // Quit the process
 
-    // Monitor =============================================================================
-    if ((shared_memory->monitor_pid = fork()) == 0) {
-        log_msg("O processo Monitor comecou", 0);
+    pid_t pid;
 
-        // // Ignore Signals in this process
-        // signal(SIGTSTP, SIG_IGN);
-        // signal(SIGINT, SIG_IGN);
+    // Monitor =============================================================================
+    if ((pid = fork()) == 0) {
+        log_msg("O processo Monitor comecou", 0);
+        shared_memory->monitor_pid = getpid();
+
+        pthread_t thread;
+        pthread_create(&thread,NULL,out,NULL);
 
         while (1) { // TODO: VARIAVEL DE CONDICAO PARA SABER QUE ENTROU UMA MENSAGEM OU SAIU PARA VERIFIVAR!!
 
@@ -127,12 +133,14 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     // Task Manager ========================================================================
-    if ((shared_memory->TM_pid = fork()) == 0) {
+    if ((pid = fork()) == 0) {
         log_msg("O processo Task Manager comecou", 0);
-
+        shared_memory->TM_pid = getpid();
         // Ignore Signals in this process
         // signal(SIGTSTP, SIG_IGN);
         // signal(SIGINT, SIG_IGN);
+        pthread_t thread;
+        pthread_create(&thread,NULL,out,NULL);
 
         task_manager();
 
@@ -143,12 +151,13 @@ int main(int argc, char *argv[]) {
     }
 
     // Maintenance Manager =================================================================
-    if ((shared_memory->maintenance_pid = fork()) == 0) {
+    if ((pid = fork()) == 0) {
         log_msg("O processo Maintenance Manager comecou", 0);
+        shared_memory->maintenance_pid = getpid();
 
-        // // Ignore Signals in this process
-        // signal(SIGTSTP, SIG_IGN);
-        // signal(SIGINT, SIG_IGN);
+        pthread_t thread;
+        pthread_create(&thread,NULL,out,NULL);
+
         sleep(5);
 
         while (1) { // FIXME: AGR ISTO FAZ VARIAS VEZES!
@@ -202,7 +211,6 @@ int main(int argc, char *argv[]) {
                 tempo = rand() % 4 + 1;
                 sleep(tempo);
 
-                // msgsnd(MQid, &my_msg, sizeof(priority_msg), 0);
 
                 servers[servidor].manutencoes += 1;
             }

@@ -108,10 +108,14 @@ typedef struct shared_memory {
     int tempo_medio;
     int em_manutencao;
     int n_manutencoes_ativas;
+    int exit ;
 
     pid_t TM_pid;
     pid_t monitor_pid;
     pid_t maintenance_pid;
+
+    pthread_t scheduler;
+    pthread_t dispatcher;
 
     sem_t *sem_manutencao; // Semaforo usado para parar os Edge Servers
     sem_t *sem_fila;       // controlar as tarefas feitas pelos ES na MQ (2 ES nao fazerem a mesma tarefa)
@@ -128,6 +132,8 @@ typedef struct shared_memory {
     pthread_cond_t cond_monitor;
     pthread_mutex_t mutex_maintenance;
     pthread_cond_t cond_maintenance;
+    pthread_mutex_t mutex_exit;
+    pthread_cond_t cond_exit;
 
     int Num_es_ativos; // numero de edge servers ativos!!
 
@@ -164,6 +170,8 @@ void task_manager();
 void server(int i);
 
 void *vCPU_routine(void *t);
+
+void *out();
 
 #endif
 

@@ -31,7 +31,7 @@ void *p_dispatcher(void *lista) { // distribuição das tarefas
         }
 
         pthread_mutex_lock(&shared_memory->mutex_dispatcher);
-        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (count <= 0))) {
+        while (((shared_memory->mode_cpu == 1) && (shared_memory->Num_es_ativos >= shared_memory->EDGE_SERVER_NUMBER)) || (shared_memory->n_tarefas == 0) || ((shared_memory->mode_cpu == 2) && (count <= 0)) || shared_memory->exit == 1) {
             sem_post(shared_memory->sem_performace);
             sem_post(shared_memory->sem_SM);
             sem_post(shared_memory->sem_fila);
@@ -271,7 +271,7 @@ void server(int i) { // TODO: recebe por um unamed pipe a tarefa a executar e se
             servers[i].manutencao = 0;
             sem_post(shared_memory->sem_manutencao);
             pthread_mutex_lock(&shared_memory->mutex_dispatcher);
-            pthread_cond_signal(&shared_memory->cond_dispatcher);
+            pthread_cond_broadcast(&shared_memory->cond_dispatcher);
             pthread_cond_signal(&shared_memory->cond_maintenance);
             pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
         } else {
@@ -402,7 +402,7 @@ void *p_scheduler(void *lista) { // gestão do escalonamento das tarefas
                     snprintf(temp, BUFSIZE, "[SCHEDULER]: Tarefa inserida na fila nº %d", lista_tarefas.n_tarefas);
                     sem_post(shared_memory->sem_fila);
                     pthread_cond_signal(&shared_memory->cond_monitor);
-                    pthread_cond_signal(&shared_memory->cond_dispatcher);
+                    pthread_cond_broadcast(&shared_memory->cond_dispatcher);
                     log_msg(temp, 0);
                     break;
                 }
@@ -430,28 +430,31 @@ void task_manager() {
     // Criar um processo para cada Edge Server
     char teste[100];
     memset(teste, 0, 100);
-
+    pid_t piid;
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
-        if ((servers[i].pid = fork()) == 0) {
+        if ((piid = fork()) == 0) {
+            servers[i].pid = getpid();
             snprintf(teste, 100, "Edge server %d arrancou", i + 1);
             log_msg(teste, 0);
+
+            pthread_t thread;
+            pthread_create(&thread, NULL, out, NULL);
+
             server(i);
             exit(0);
         }
     }
 
     // Criação da thread scheduler
-    pthread_t scheduler;
-    pthread_create(&scheduler, NULL, p_scheduler, NULL); // Criação da thread scheduler
+    pthread_create(&shared_memory->scheduler, NULL, p_scheduler, NULL); // Criação da thread scheduler
     log_msg("Criação da thread scheduler", 0);
 
     // Criação da thread dispatcher
-    pthread_t dispatcher;
-    pthread_create(&dispatcher, NULL, p_dispatcher, NULL); // Criação da thread dispatcher
+    pthread_create(&shared_memory->dispatcher, NULL, p_dispatcher, NULL); // Criação da thread dispatcher
     log_msg("Criação da thread dispatcher", 0);
 
-    pthread_join(scheduler, NULL);
-    pthread_join(dispatcher, NULL);
+    pthread_join(shared_memory->scheduler, NULL);
+    pthread_join(shared_memory->dispatcher, NULL);
 }
 
 // Funcao encarregue de executar as tarefas do Edge Server
@@ -474,7 +477,7 @@ void *vCPU_routine(void *t) {
     sem_post(shared_memory->sem_SM);
 
     pthread_cond_broadcast(&shared_memory->cond_manutencao);
-    pthread_cond_signal(&shared_memory->cond_dispatcher);
+    pthread_cond_broadcast(&shared_memory->cond_dispatcher);
 
     pthread_exit(NULL);
 }

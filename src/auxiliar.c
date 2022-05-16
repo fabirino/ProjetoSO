@@ -51,7 +51,7 @@ void reoorganizar(base *pf) {
                 }
 
             } else { // Diminuir os tempos de execucao
-                aux->prioridade = (int) aux->tarefa.max_tempo - (int)intervalo;
+                aux->prioridade = (int)aux->tarefa.max_tempo - (int)intervalo;
             }
         }
         anterior = aux;
@@ -126,7 +126,6 @@ bool retirar(base *pf, Task *ptarefa) {
 
     return true;
 }
-
 
 //#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -224,6 +223,7 @@ void config(char *path) {
     shared_memory->n_tarefas = 0;
     shared_memory->tempo_medio = 0;
     shared_memory->em_manutencao = 0;
+    shared_memory->exit = 0;
 }
 
 // funcao que cria os edge servers com base first_node dados obtidos no ficheiro config
@@ -288,6 +288,37 @@ void createEdgeServers(char *path) {
     }
 }
 
+void *out() {
+
+    pid_t pidd = getpid();
+
+    pthread_mutex_lock(&shared_memory->mutex_exit);
+    pthread_cond_wait(&shared_memory->cond_exit, &shared_memory->mutex_exit);
+    pthread_mutex_unlock(&shared_memory->mutex_exit);
+
+    if (pidd == shared_memory->TM_pid) {
+        printf("TASK Manager a Terminar!\n");
+        pthread_cancel(shared_memory->scheduler);
+        printf("Schedular a Terminar\n");
+        pthread_cancel(shared_memory->dispatcher);
+        printf("Dispatcher a Terminar\n");
+
+    } else if (pidd == shared_memory->monitor_pid) {
+        printf("Monitor a Terminar!\n");
+    } else if (pidd == shared_memory->maintenance_pid) {
+        printf("Maintenance a Terminar!\n");
+    } else {
+        for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
+            if (pidd == servers[i].pid) {
+                printf("Server%d a Terminar!\n",i);
+                pthread_cancel(servers[i].vCPU[0]);
+                pthread_cancel(servers[i].vCPU[1]);
+            }
+        }
+    }
+    exit(0);
+}
+
 // Funcao que trata do CTRL-Z (imprime as estatisticas)
 void SIGTSTP_HANDLER(int signum) {
 
@@ -341,8 +372,30 @@ void SIGINT_HANDLER(int signum) {
     printf("\n");
     log_msg("Sinal SIGINT recebido", 0);
     // Esperar que as threads dos Edge Servers terminem
+    sem_wait(shared_memory->sem_SM);
+    shared_memory->exit = 1;
+    sem_post(shared_memory->sem_SM);
+
+    sem_wait(shared_memory->sem_SM);
+    pthread_mutex_lock(&shared_memory->mutex_dispatcher);
+    while (shared_memory->Num_es_ativos > 0) {
+
+        sem_post(shared_memory->sem_SM);
+
+        pthread_cond_wait(&shared_memory->cond_dispatcher, &shared_memory->mutex_dispatcher);
+        sem_wait(shared_memory->sem_SM);
+    }
+    sem_post(shared_memory->sem_SM);
+
+    pthread_mutex_unlock(&shared_memory->mutex_dispatcher);
+    
 
     log_msg("Esperando as ultimas tarefas terminarem", 0); // TODO:
+
+    pthread_cond_broadcast(&shared_memory->cond_exit);
+
+    while (wait(NULL) > 0)
+        ;
 
     // TODO: terminar a MQ
     msgctl(MQid, IPC_RMID, 0);
@@ -363,27 +416,23 @@ void SIGINT_HANDLER(int signum) {
     sem_unlink("SEM_PERFORMACE");
     sem_unlink("SEM_FILA");
 
+
     // Close pipes
     for (int i = 0; i < shared_memory->EDGE_SERVER_NUMBER; i++) {
         close(servers[i].fd[READ]);
         close(servers[i].fd[WRITE]);
     }
 
+
     // Remove shared_memory
-    // if (shmdt(shared_memory)== -1){
-    //       perror("acoplamento impossivel") ;
-    //  }
-    // if ( shmctl(shmid, IPC_RMID,0) == -1){
-    //       perror("destruicao impossivel") ;
-    //  }
-
-    kill(shared_memory->maintenance_pid, SIGKILL);
-    kill(shared_memory->monitor_pid, SIGKILL);
-    kill(shared_memory->TM_pid, SIGKILL);
-
-    log_msg("O programa terminou\n", 0);
+    if (shmdt(shared_memory)== -1){
+          perror("acoplamento impossivel") ;
+     }
+    if ( shmctl(shmid, IPC_RMID,0) == -1){
+          perror("destruicao impossivel") ;
+     }
+    // log_msg("O programa terminou\n", 0);
     // FIXME: sempre que ha um kill() o programa acaba imediatamente
     /* Guarantees that every process receives a SIGTERM , to kill them */
-    kill(0, SIGTERM);
     exit(0);
 }
